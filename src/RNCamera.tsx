@@ -4,15 +4,14 @@ import PropTypes from 'prop-types';
 import {
   findNodeHandle,
   Platform,
-  NativeModules,
-  ViewPropTypes,
-  requireNativeComponent,
   View,
   ActivityIndicator,
   Text,
   StyleSheet,
-  PermissionsAndroid,
 } from 'react-native';
+import {ViewPropTypes} from 'deprecated-react-native-prop-types'
+import RNCamera from './spec/fabric/RNCCameraNativeComponent'
+import CameraTurboModule from './spec/turbomodule/NativeCameraTurboModule'
 
 import type { FaceFeature } from './FaceDetector';
 
@@ -33,43 +32,11 @@ const requestPermissions = async (
   let hasCameraPermissions = false;
   let hasRecordAudioPermissions = false;
 
-  if (Platform.OS === 'ios') {
-    hasCameraPermissions = await CameraManager.checkVideoAuthorizationStatus();
-  } else if (Platform.OS === 'android') {
-    const cameraPermissionResult = await PermissionsAndroid.request(
-      PermissionsAndroid.PERMISSIONS.CAMERA,
-      androidCameraPermissionOptions,
-    );
-    if (typeof cameraPermissionResult === 'boolean') {
-      hasCameraPermissions = cameraPermissionResult;
-    } else {
-      hasCameraPermissions = cameraPermissionResult === PermissionsAndroid.RESULTS.GRANTED;
-    }
-  }
+
+  hasCameraPermissions = await CameraManager.checkVideoAuthorizationStatus();
 
   if (captureAudio) {
-    if (Platform.OS === 'ios') {
-      hasRecordAudioPermissions = await CameraManager.checkRecordAudioAuthorizationStatus();
-    } else if (Platform.OS === 'android') {
-      if (await CameraManager.checkIfRecordAudioPermissionsAreDefined()) {
-        const audioPermissionResult = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
-          androidRecordAudioPermissionOptions,
-        );
-        if (typeof audioPermissionResult === 'boolean') {
-          hasRecordAudioPermissions = audioPermissionResult;
-        } else {
-          hasRecordAudioPermissions = audioPermissionResult === PermissionsAndroid.RESULTS.GRANTED;
-        }
-      } else if (__DEV__) {
-        // eslint-disable-next-line no-console
-        console.warn(
-          `The 'captureAudio' property set on RNCamera instance but 'RECORD_AUDIO' permissions not defined in the applications 'AndroidManifest.xml'. ` +
-            `If you want to record audio you will have to add '<uses-permission android:name="android.permission.RECORD_AUDIO"/>' to your 'AndroidManifest.xml'. ` +
-            `Otherwise you should set the 'captureAudio' property on the component instance to 'false'.`,
-        );
-      }
-    }
+    hasRecordAudioPermissions = await CameraManager.checkRecordAudioAuthorizationStatus?.();
   }
 
   return {
@@ -147,7 +114,7 @@ type TrackedBarcodeFeature = {
   }[],
   emails?: Email[],
   phones?: Phone[],
-  urls: ?(string[]),
+  urls?:(string[]),
   name?: {
     firstName?: string,
     lastName?: string,
@@ -240,7 +207,7 @@ type Rect = {
   height: number,
 };
 
-type PropsType = typeof View.props & {
+type PropsType = typeof ViewPropTypes & {
   zoom?: number,
   maxZoom?: number,
   ratio?: string,
@@ -253,8 +220,8 @@ type PropsType = typeof View.props & {
   onBarCodeRead?: Function,
   onPictureTaken?: Function,
   onPictureSaved?: Function,
-  onGoogleVisionBarcodesDetected?: ({ barcodes: Array<TrackedBarcodeFeature> }) => void,
-  onSubjectAreaChanged?: ({ nativeEvent: { prevPoint: {| x: number, y: number |} } }) => void,
+  onGoogleVisionBarcodesDetected?: ({ barcodes }: {barcodes:Array<TrackedBarcodeFeature>}) => void,
+  onSubjectAreaChanged?: ({ nativeEvent: { prevPoint: {x, y } } }: any) => void,
   faceDetectionMode?: number,
   trackingEnabled?: boolean,
   flashMode?: number | string,
@@ -267,8 +234,8 @@ type PropsType = typeof View.props & {
   autoFocus?: string | boolean | number,
   autoFocusPointOfInterest?: { x: number, y: number },
   faceDetectionClassifications?: number,
-  onFacesDetected?: ({ faces: Array<TrackedFaceFeature> }) => void,
-  onTextRecognized?: ({ textBlocks: Array<TrackedTextFeature> }) => void,
+  onFacesDetected?: ({ faces }: {faces: Array<TrackedFaceFeature>}) => void,
+  onTextRecognized?: ({ textBlocks}: {textBlocks: Array<TrackedTextFeature>}) => void,
   captureAudio?: boolean,
   keepAudioSession?: boolean,
   useCamera2Api?: boolean,
@@ -302,8 +269,7 @@ const RecordAudioPermissionStatusEnum: {
   NOT_AUTHORIZED: 'NOT_AUTHORIZED',
 };
 
-const CameraManager: Object = NativeModules.RNCameraManager ||
-  NativeModules.RNCameraModule || {
+const CameraManager = CameraTurboModule || {
     stubbed: true,
     Type: {
       back: 1,
@@ -334,8 +300,8 @@ const CameraManager: Object = NativeModules.RNCameraManager ||
 
 const EventThrottleMs = 500;
 
-const mapValues = (input, mapper) => {
-  const result = {};
+const mapValues = (input: any, mapper: any) => {
+  const result: any = {};
   Object.entries(input).map(([key, value]) => {
     result[key] = mapper(value, key);
   });
@@ -344,18 +310,18 @@ const mapValues = (input, mapper) => {
 
 export default class Camera extends React.Component<PropsType, StateType> {
   static Constants = {
-    Type: CameraManager.Type,
-    FlashMode: CameraManager.FlashMode,
-    AutoFocus: CameraManager.AutoFocus,
-    WhiteBalance: CameraManager.WhiteBalance,
-    VideoQuality: CameraManager.VideoQuality,
-    VideoCodec: CameraManager.VideoCodec,
-    BarCodeType: CameraManager.BarCodeType,
-    GoogleVisionBarcodeDetection: CameraManager.GoogleVisionBarcodeDetection,
-    FaceDetection: CameraManager.FaceDetection,
+    Type: CameraManager.getConstants().Type,
+    FlashMode: CameraManager.getConstants().FlashMode,
+    AutoFocus: CameraManager.getConstants().AutoFocus,
+    WhiteBalance: CameraManager.getConstants().WhiteBalance,
+    VideoQuality: CameraManager.getConstants().VideoQuality,
+    VideoCodec: CameraManager.getConstants().VideoCodec,
+    BarCodeType: CameraManager.getConstants().BarCodeType,
+    GoogleVisionBarcodeDetection: CameraManager.getConstants().GoogleVisionBarcodeDetection,
+    FaceDetection: CameraManager.getConstants().FaceDetection,
     CameraStatus,
     RecordAudioPermissionStatus: RecordAudioPermissionStatusEnum,
-    VideoStabilization: CameraManager.VideoStabilization,
+    VideoStabilization: CameraManager.getConstants().VideoStabilization,
     Orientation: {
       auto: 'auto',
       landscapeLeft: 'landscapeLeft',
@@ -367,16 +333,16 @@ export default class Camera extends React.Component<PropsType, StateType> {
 
   // Values under keys from this object will be transformed to native options
   static ConversionTables = {
-    type: CameraManager.Type,
-    flashMode: CameraManager.FlashMode,
-    exposure: CameraManager.Exposure,
-    autoFocus: CameraManager.AutoFocus,
-    whiteBalance: CameraManager.WhiteBalance,
-    faceDetectionMode: (CameraManager.FaceDetection || {}).Mode,
-    faceDetectionLandmarks: (CameraManager.FaceDetection || {}).Landmarks,
-    faceDetectionClassifications: (CameraManager.FaceDetection || {}).Classifications,
-    googleVisionBarcodeType: (CameraManager.GoogleVisionBarcodeDetection || {}).BarcodeType,
-    videoStabilizationMode: CameraManager.VideoStabilization || {},
+    type: CameraManager.getConstants().Type,
+    flashMode: CameraManager.getConstants().FlashMode,
+    exposure: CameraManager.getConstants().Exposure,
+    autoFocus: CameraManager.getConstants().AutoFocus,
+    whiteBalance: CameraManager.getConstants().WhiteBalance,
+    faceDetectionMode: (CameraManager.getConstants().FaceDetection || {}).Mode,
+    faceDetectionLandmarks: (CameraManager.getConstants().FaceDetection || {}).Landmarks,
+    faceDetectionClassifications: (CameraManager.getConstants().FaceDetection || {}).Classifications,
+    googleVisionBarcodeType: (CameraManager.getConstants().GoogleVisionBarcodeDetection || {}).BarcodeType,
+    videoStabilizationMode: CameraManager.getConstants().VideoStabilization || {},
   };
 
   static propTypes = {
@@ -433,20 +399,20 @@ export default class Camera extends React.Component<PropsType, StateType> {
     maxZoom: 0,
     ratio: '4:3',
     focusDepth: 0,
-    type: CameraManager.Type.back,
+    type: CameraManager.getConstants().Type.back,
     cameraId: null,
-    autoFocus: CameraManager.AutoFocus.on,
-    flashMode: CameraManager.FlashMode.off,
+    autoFocus: CameraManager.getConstants().AutoFocus.on,
+    flashMode: CameraManager.getConstants().FlashMode.off,
     exposure: -1,
-    whiteBalance: CameraManager.WhiteBalance.auto,
-    faceDetectionMode: (CameraManager.FaceDetection || {}).fast,
-    barCodeTypes: Object.values(CameraManager.BarCodeType),
-    googleVisionBarcodeType: ((CameraManager.GoogleVisionBarcodeDetection || {}).BarcodeType || {})
+    whiteBalance: CameraManager.getConstants().WhiteBalance.auto,
+    faceDetectionMode: (CameraManager.getConstants().FaceDetection || {}).fast,
+    barCodeTypes: Object.values(CameraManager.getConstants().BarCodeType),
+    googleVisionBarcodeType: ((CameraManager.getConstants().GoogleVisionBarcodeDetection || {}).BarcodeType || {})
       .None,
-    googleVisionBarcodeMode: ((CameraManager.GoogleVisionBarcodeDetection || {}).BarcodeMode || {})
+    googleVisionBarcodeMode: ((CameraManager.getConstants().GoogleVisionBarcodeDetection || {}).BarcodeMode || {})
       .NORMAL,
-    faceDetectionLandmarks: ((CameraManager.FaceDetection || {}).Landmarks || {}).none,
-    faceDetectionClassifications: ((CameraManager.FaceDetection || {}).Classifications || {}).none,
+    faceDetectionLandmarks: ((CameraManager.getConstants().FaceDetection || {}).Landmarks || {}).none,
+    faceDetectionClassifications: ((CameraManager.getConstants().FaceDetection || {}).Classifications || {}).none,
     permissionDialogTitle: '',
     permissionDialogMessage: '',
     androidCameraPermissionOptions: {
@@ -476,10 +442,10 @@ export default class Camera extends React.Component<PropsType, StateType> {
     mirrorVideo: false,
   };
 
-  _cameraRef: ?Object;
-  _cameraHandle: ?number;
-  _lastEvents: { [string]: string };
-  _lastEventsTimes: { [string]: Date };
+  _cameraRef?: Object;
+  _cameraHandle?: number;
+  _lastEvents: any;
+  _lastEventsTimes: any;
   _isMounted: boolean;
 
   constructor(props: PropsType) {
@@ -488,9 +454,9 @@ export default class Camera extends React.Component<PropsType, StateType> {
     this._lastEventsTimes = {};
     this._isMounted = true;
     this.state = {
-      isAuthorized: false,
+      isAuthorized: true,
       isAuthorizationChecked: false,
-      recordAudioPermissionStatus: RecordAudioPermissionStatusEnum.PENDING_AUTHORIZATION,
+      recordAudioPermissionStatus: (RecordAudioPermissionStatusEnum as any).PENDING_AUTHORIZATION,
     };
   }
 
@@ -505,7 +471,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     if (options.orientation) {
       if (typeof options.orientation !== 'number') {
         const { orientation } = options;
-        options.orientation = CameraManager.Orientation[orientation];
+        options.orientation = CameraManager.getConstants().Orientation[orientation];
         if (__DEV__) {
           if (typeof options.orientation !== 'number') {
             // eslint-disable-next-line no-console
@@ -527,22 +493,14 @@ export default class Camera extends React.Component<PropsType, StateType> {
   }
 
   async getSupportedRatiosAsync() {
-    if (Platform.OS === 'android') {
-      return await CameraManager.getSupportedRatios(this._cameraHandle);
-    } else {
-      throw new Error('Ratio is not supported on iOS');
-    }
+    throw new Error('Ratio is not supported on harmony');
   }
 
   async getCameraIdsAsync() {
-    if (Platform.OS === 'android') {
-      return await CameraManager.getCameraIds(this._cameraHandle);
-    } else {
-      return await CameraManager.getCameraIds(); // iOS does not need a camera instance
-    }
+    return await CameraManager.getCameraIds();
   }
 
-  getAvailablePictureSizes = async (): string[] => {
+  getAvailablePictureSizes = async (): Promise<string[]> => {
     //$FlowFixMe
     return await CameraManager.getAvailablePictureSizes(this.props.ratio, this._cameraHandle);
   };
@@ -556,7 +514,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     if (options.orientation) {
       if (typeof options.orientation !== 'number') {
         const { orientation } = options;
-        options.orientation = CameraManager.Orientation[orientation];
+        options.orientation = CameraManager.getConstants().Orientation[orientation];
         if (__DEV__) {
           if (typeof options.orientation !== 'number') {
             // eslint-disable-next-line no-console
@@ -651,7 +609,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     }
   };
 
-  _onObjectDetected = (callback: ?Function) => ({ nativeEvent }: EventCallbackArgumentsType) => {
+  _onObjectDetected = (callback?: Function) => ({ nativeEvent }: EventCallbackArgumentsType) => {
     const { type } = nativeEvent;
     if (
       this._lastEvents[type] &&
@@ -675,7 +633,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     }
   };
 
-  _setReference = (ref: ?Object) => {
+  _setReference = (ref?: Object) => {
     if (ref) {
       this._cameraRef = ref;
       this._cameraHandle = findNodeHandle(ref);
@@ -729,22 +687,6 @@ export default class Camera extends React.Component<PropsType, StateType> {
     return { hasCameraPermissions, recordAudioPermissionStatus };
   }
 
-  async refreshAuthorizationStatus() {
-    const {
-      hasCameraPermissions,
-      recordAudioPermissionStatus,
-    } = await this.arePermissionsGranted();
-    if (this._isMounted === false) {
-      return;
-    }
-
-    this.setState({
-      isAuthorized: hasCameraPermissions,
-      isAuthorizationChecked: true,
-      recordAudioPermissionStatus,
-    });
-  }
-
   async componentDidMount() {
     const {
       hasCameraPermissions,
@@ -773,9 +715,9 @@ export default class Camera extends React.Component<PropsType, StateType> {
   };
 
   // FaCC = Function as Child Component;
-  hasFaCC = (): * => typeof this.props.children === 'function';
+  hasFaCC = (): any => typeof this.props.children === 'function';
 
-  renderChildren = (): * => {
+  renderChildren = (): any => {
     if (this.hasFaCC()) {
       return this.props.children({
         camera: this,
@@ -788,7 +730,6 @@ export default class Camera extends React.Component<PropsType, StateType> {
 
   render() {
     const { style, ...nativeProps } = this._convertNativeProps(this.props);
-
     if (this.state.isAuthorized || this.hasFaCC()) {
       return (
         <View style={style}>
@@ -846,7 +787,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     return newProps;
   }
 
-  _convertProp(value: *, key: string): * {
+  _convertProp(value: any, key: string): any {
     if (typeof value === 'string' && Camera.ConversionTables[key]) {
       return Camera.ConversionTables[key][value];
     }
@@ -857,27 +798,3 @@ export default class Camera extends React.Component<PropsType, StateType> {
 
 export const Constants = Camera.Constants;
 
-const RNCamera = requireNativeComponent('RNCamera', Camera, {
-  nativeOnly: {
-    accessibilityComponentType: true,
-    accessibilityLabel: true,
-    accessibilityLiveRegion: true,
-    barCodeScannerEnabled: true,
-    googleVisionBarcodeDetectorEnabled: true,
-    faceDetectorEnabled: true,
-    textRecognizerEnabled: true,
-    importantForAccessibility: true,
-    onBarCodeRead: true,
-    onGoogleVisionBarcodesDetected: true,
-    onCameraReady: true,
-    onAudioInterrupted: true,
-    onAudioConnected: true,
-    onPictureSaved: true,
-    onFaceDetected: true,
-    onLayout: true,
-    onMountError: true,
-    onSubjectAreaChanged: true,
-    renderToHardwareTextureAndroid: true,
-    testID: true,
-  },
-});
