@@ -1,7 +1,7 @@
 {
   "name": "@react-native-oh-tpl/react-native-camera",
   "description": "A Camera component for React Native. Also reads barcodes.",
-  "version": "3.15.0",
+  "version": "3.15.1-rc.1",
   "scripts": {
     "prettier": "prettier --write",
     "codegen-lib": "react-native codegen-lib-harmony --no-safety-check --npm-package-name react-native-camera --cpp-output-path ../harmony/rn_camera/src/main/cpp/generated --ets-output-path ../harmony/rn_camera/src/main/ets/generated --turbo-modules-spec-paths ./src/spec/turbomodule --arkts-components-spec-paths ./src/spec/fabric"
