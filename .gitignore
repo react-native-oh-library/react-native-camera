@@ -44,3 +44,6 @@ package-json.lock
 
 # vscode
 .vscode
+yarn.lock
+package-lock.json
+BuildProfile.ets
