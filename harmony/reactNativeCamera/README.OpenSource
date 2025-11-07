@@ -1,0 +1,11 @@
+[
+    {
+        "Name": "react-native-camera",
+        "License": "MIT License",
+        "License File": "https://github.com/react-native-camera/react-native-camera/blob/v3.40.0/LICENSE",
+        "Version Number": "3.40.0",
+        "Owner" : "react-native-camera"
+        "Upstream URL": "https://github.com/react-native-camera/react-native-camera",
+        "Description": "A Camera component for React Native. Also supports barcode scanning!"
+    }
+]

@@ -1,0 +1,5 @@
+export enum AuthType {
+  READY,
+  PENDING_AUTHORIZATION,
+  NOT_AUTHORIZED,
+}
