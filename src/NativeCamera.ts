@@ -288,7 +288,7 @@ type WhiteBalance = 'sunny' | 'cloudy' | 'shadow' | 'incandescent' | 'fluorescen
 type FlashMode = 'on' | 'off' | 'torch' | 'auto';
 
 export interface NativeProps extends ViewProps {
-  autoFocus: WithDefault<AutoFocusMode, "on">,
+  autoFocus?: WithDefault<AutoFocusMode, 'on'>,
   autoFocusPointOfInterest?: { x: Int32, y: Int32 },
   pictureSize?: string,
   type?: WithDefault<CameraType, 'back'>,
@@ -321,16 +321,15 @@ export interface NativeProps extends ViewProps {
   faceDetectorEnabled: boolean,
   textRecognizerEnabled: boolean,
   onBarCodeRead: DirectEventHandler<BarCodeReadEvent>,
-  onGoogleVisionBarcodesDetected: DirectEventHandler<GoogleVisionBarcodesDetectedEvent>,
+  // onGoogleVisionBarcodesDetected: DirectEventHandler<GoogleVisionBarcodesDetectedEvent>,
   onCameraReady: DirectEventHandler<VoidEventData>,
   onAudioInterrupted: DirectEventHandler<VoidEventData>,
   onAudioConnected: DirectEventHandler<VoidEventData>,
   onPictureSaved: DirectEventHandler<VoidEventData>,
   onFaceDetected: DirectEventHandler<VoidEventData>,
   onTouch: DirectEventHandler<TapCallback>,
-  // onLayout: boolean,
   onMountError: DirectEventHandler<CameraErrorMessage>,
-  onSubjectAreaChanged: DirectEventHandler<SubjectAreaChanged>,
+  // onSubjectAreaChanged: DirectEventHandler<SubjectAreaChanged>,
   onRecordingStart: DirectEventHandler<RecordStartData>,
   onRecordingEnd: DirectEventHandler<VoidEventData>,
   onPictureTaken: DirectEventHandler<VoidEventData>,
@@ -339,8 +338,8 @@ export interface NativeProps extends ViewProps {
 
 type NativeCameraType = HostComponent<NativeProps>;
 export interface NativeCommands {
-  takePicture: (viewRef: React.ElementRef<NativeCameraType>, options?: PictureOptions) => Promise<TakePictureResponse>;
-  record(viewRef: React.ElementRef<NativeCameraType>, options?: RecordOptions): Promise<RecordResponse>;
+  takePicture: (viewRef: React.ElementRef<NativeCameraType>, options?: string) => void;
+  record(viewRef: React.ElementRef<NativeCameraType>, options?: string): Promise<RecordResponse>;
   stopRecording(viewRef: React.ElementRef<NativeCameraType>): void;
   pauseRecording(viewRef: React.ElementRef<NativeCameraType>): void;
   resumeRecording(viewRef: React.ElementRef<NativeCameraType>): void;
@@ -352,7 +351,7 @@ export interface NativeCommands {
   isRecording(viewRef: React.ElementRef<NativeCameraType>): Promise<boolean>;
 }
 
-export const reactCameraCommands: NativeCommands = codegenNativeCommands<NativeCommands>({
+export const Commands: NativeCommands = codegenNativeCommands<NativeCommands>({
   supportedCommands: ["takePicture", "record", "stopRecording",
     "pauseRecording", "resumeRecording", "pausePreview", "resumePreview", "getAvailablePictureSizes"
     , "getSupportedRatios", "getSupportedPreviewFpsRange", "isRecording"]

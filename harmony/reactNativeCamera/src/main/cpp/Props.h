@@ -52,7 +52,7 @@ struct RectOfInterest {
 }; // namespace react
 
 static inline void fromRawValue(const PropsParserContext &context, const RawValue &value, FocusPoint &result) {
-    auto map = (butter::map<std::string, RawValue>)value;
+    auto map = (std::unordered_map<std::string, RawValue>)value;
     auto x = map.find("x");
     if (x != map.end()) {
         fromRawValue(context, x->second, result.x);
@@ -67,7 +67,7 @@ static inline std::string toString(const FocusPoint &value) { return "[Object Fo
 
 
 static inline void fromRawValue(const PropsParserContext &context, const RawValue &value, RectOfInterest &result) {
-    auto map = (butter::map<std::string, RawValue>)value;
+    auto map = (std::unordered_map<std::string, RawValue>)value;
 
     auto x = map.find("x");
     if (x != map.end()) {
