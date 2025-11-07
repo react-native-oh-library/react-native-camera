@@ -307,11 +307,13 @@ export default class CameraSession {
     let focusMode;
     if (props.autoFocus === "on") {
       focusMode = camera.FocusMode.FOCUS_MODE_AUTO
-      this.focusRn(focusMode, props.autoFocusPointOfInterest);
-    } else if (props.focusDepth) {
-      Logger.debug("focusDepth" + props.focusDepth)
+      this.focus(focusMode, { x: 480, y: 860 });
+    } else if (props.focusDepth != null) {
       focusMode = camera.FocusMode.FOCUS_MODE_AUTO
-      this.focusRn(focusMode, { "x": props.focusDepth, "y": props.focusDepth })
+      this.focus(focusMode, { x: props.focusDepth * 90, y: props.focusDepth * 160  })
+    } else {
+      focusMode = camera.FocusMode.FOCUS_MODE_MANUAL
+      this.focus(focusMode)
     }
 
     this.initProps(props);
@@ -780,6 +782,7 @@ export default class CameraSession {
     try {
       //[-4,4]
       const [min, max]: Array<number> = cameraSession.getExposureBiasRange();
+      exposure = exposure * 4;
       if (exposure >= min && exposure <= max) {
         cameraSession?.setExposureBias(exposure);
         Logger.debug(`RNOH in setExposureBias success`);
@@ -793,6 +796,7 @@ export default class CameraSession {
   //设置缩放[0.49,50]
   setSmoothZoom(zoom: number): void {
     Logger.debug(`RNOH in NativeCamera setSmoothZoom:${zoom}`);
+    zoom = zoom * 10
     try {
       const [min, max]: Array<number> = this.getZoomRange();
       if (zoom <= min) {
@@ -1002,7 +1006,7 @@ export default class CameraSession {
   /**
    * 参数配置
    */
-  focus(mode: camera.FocusMode, rnPoint: Point) {
+  focus(mode: camera.FocusMode, rnPoint?: Point) {
     let status: boolean = false;
     const targetSession = this.photoSession ? this.photoSession : this.videoSession;
     //设置对接模式
