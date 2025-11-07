@@ -1,7 +1,7 @@
 // @flow
 import React from 'react';
 import PropTypes from 'prop-types';
-import NativeCamera, { reactCameraCommands, RecordResponse } from "./NativeCamera";
+import NativeCamera, { Commands, RecordResponse } from "./NativeCamera";
 import NativeCameraModule from "./NativeCameraModule";
 import { FaceFeature } from './FaceDetector';
 import {
@@ -552,7 +552,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
           onCodeScannedListener.remove();
         });
 
-        reactCameraCommands.takePicture(this._cameraRef, options)
+        Commands.takePicture(this._cameraRef, options)
       }
       catch (e) {
         reject(e);
@@ -563,7 +563,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
 
   async getSupportedRatiosAsync() {
     if (Platform.OS === 'android') {
-      return await reactCameraCommands.getSupportedRatios(this._cameraHandle);
+      return await Commands.getSupportedRatios(this._cameraHandle);
     } else {
       throw new Error('Ratio is not supported on iOS');
     }
@@ -590,7 +590,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
 
   getSupportedPreviewFpsRange = async (): Promise<[]> => {
     if (Platform.OS === 'android') {
-      return await reactCameraCommands.getSupportedPreviewFpsRange(this._cameraHandle);
+      return await Commands.getSupportedPreviewFpsRange(this._cameraHandle);
     } else {
       throw new Error('getSupportedPreviewFpsRange is not supported on iOS');
     }
@@ -656,7 +656,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
           resolve(video)
           onRecordingFinishedListener.remove();
         });
-        reactCameraCommands.record(this._cameraRef, options)
+        Commands.record(this._cameraRef, options)
       }
       catch (e) {
         reject(e);
@@ -669,21 +669,21 @@ export default class Camera extends React.Component<PropsType, StateType> {
     if (!this._cameraRef) {
       throw 'Camera handle cannot be null';
     }
-    reactCameraCommands.stopRecording(this._cameraRef);
+    Commands.stopRecording(this._cameraRef);
   }
 
   pauseRecording() {
     if (!this._cameraRef) {
       throw 'Camera handle cannot be null';
     }
-    reactCameraCommands.pauseRecording(this._cameraRef);
+    Commands.pauseRecording(this._cameraRef);
   }
 
   resumeRecording() {
     if (!this._cameraRef) {
       throw 'Camera handle cannot be null';
     }
-    reactCameraCommands.resumeRecording(this._cameraRef);
+    Commands.resumeRecording(this._cameraRef);
   }
 
   pausePreview() {
@@ -691,7 +691,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
       throw 'Camera handle cannot be null';
     }
 
-    reactCameraCommands.pausePreview(this._cameraRef);
+    Commands.pausePreview(this._cameraRef);
   }
 
   isRecording() {
@@ -704,7 +704,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
           resolve(isRecording)
           isRecordingFinishedListener.remove();
         });
-        reactCameraCommands.isRecording(this._cameraRef)
+        Commands.isRecording(this._cameraRef)
       }
       catch (e) {
         reject(e);
@@ -717,7 +717,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     if (!this._cameraRef) {
       throw 'Camera handle cannot be null';
     }
-    reactCameraCommands.resumePreview(this._cameraRef);
+    Commands.resumePreview(this._cameraRef);
   }
 
   _onMountError = ({ nativeEvent }: EventCallbackArgumentsType) => {
