@@ -308,16 +308,14 @@ export struct ReactCameraView {
     if (descriptor.props.autoFocus === "on") {
       Logger.debug("autoFocus" + descriptor.props.autoFocus)
       this.focusMode = camera.FocusMode.FOCUS_MODE_AUTO
-      this.cameraSession.focusRn(this.focusMode, descriptor.props.autoFocusPointOfInterest);
-    } else {
-      this.focusMode = camera.FocusMode.FOCUS_MODE_AUTO
-      this.cameraSession.focusRn(this.focusMode);
-    }
-
-    if (descriptor.props.autoFocus === "off" && descriptor.props.focusDepth) {
+      this.cameraSession.focus(this.focusMode, { x: 480, y: 860 });
+    } else if (descriptor.props.autoFocus != "on" && descriptor.props.focusDepth) {
       Logger.debug("focusDepth" + descriptor.props.focusDepth)
       this.focusMode = camera.FocusMode.FOCUS_MODE_AUTO
-      this.cameraSession.focusRn(this.focusMode, { "x": descriptor.props.focusDepth, "y": descriptor.props.focusDepth })
+      this.cameraSession.focus(this.focusMode, { x: descriptor.props.focusDepth * 90, y: descriptor.props.focusDepth * 160  })
+    } else {
+      this.focusMode = camera.FocusMode.FOCUS_MODE_MANUAL
+      this.cameraSession.focus(this.focusMode);
     }
 
 
