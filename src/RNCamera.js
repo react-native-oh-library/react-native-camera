@@ -1,20 +1,20 @@
 // @flow
 import React from 'react';
 import PropTypes from 'prop-types';
+import NativeCamera, { reactCameraCommands, RecordResponse } from "./NativeCamera";
+import NativeCameraModule from "./NativeCameraModule";
+import { FaceFeature } from './FaceDetector';
 import {
   findNodeHandle,
   Platform,
-  NativeModules,
   ViewPropTypes,
-  requireNativeComponent,
   View,
   ActivityIndicator,
   Text,
   StyleSheet,
   PermissionsAndroid,
+  DeviceEventEmitter
 } from 'react-native';
-
-import type { FaceFeature } from './FaceDetector';
 
 const Rationale = PropTypes.shape({
   title: PropTypes.string.isRequired,
@@ -32,7 +32,6 @@ const requestPermissions = async (
 ): Promise<{ hasCameraPermissions: boolean, hasRecordAudioPermissions: boolean }> => {
   let hasCameraPermissions = false;
   let hasRecordAudioPermissions = false;
-
   if (Platform.OS === 'ios') {
     hasCameraPermissions = await CameraManager.checkVideoAuthorizationStatus();
   } else if (Platform.OS === 'android') {
@@ -47,6 +46,8 @@ const requestPermissions = async (
     }
   } else if (Platform.OS === 'windows') {
     hasCameraPermissions = await CameraManager.checkMediaCapturePermission();
+  } else if (Platform.OS === 'harmony') {
+    hasCameraPermissions = await NativeCameraModule.getCameraPermission();
   }
 
   if (captureAudio) {
@@ -67,12 +68,14 @@ const requestPermissions = async (
         // eslint-disable-next-line no-console
         console.warn(
           `The 'captureAudio' property set on RNCamera instance but 'RECORD_AUDIO' permissions not defined in the applications 'AndroidManifest.xml'. ` +
-            `If you want to record audio you will have to add '<uses-permission android:name="android.permission.RECORD_AUDIO"/>' to your 'AndroidManifest.xml'. ` +
-            `Otherwise you should set the 'captureAudio' property on the component instance to 'false'.`,
+          `If you want to record audio you will have to add '<uses-permission android:name="android.permission.RECORD_AUDIO"/>' to your 'AndroidManifest.xml'. ` +
+          `Otherwise you should set the 'captureAudio' property on the component instance to 'false'.`,
         );
       }
     } else if (Platform.OS === 'windows') {
       hasRecordAudioPermissions = await CameraManager.checkMediaCapturePermission();
+    } else if (Platform.OS === 'harmony') {
+      hasRecordAudioPermissions = await NativeCameraModule.getAuidPermission();
     }
   }
 
@@ -265,27 +268,27 @@ type PropsType = typeof View.props & {
   onDoubleTap?: Function,
   onGoogleVisionBarcodesDetected?: ({ barcodes: Array<TrackedBarcodeFeature> }) => void,
   onSubjectAreaChanged?: ({ nativeEvent: { prevPoint: {| x: number, y: number |} } }) => void,
-  faceDetectionMode?: number,
-  trackingEnabled?: boolean,
-  flashMode?: number | string,
-  exposure?: number,
-  barCodeTypes?: Array<string>,
-  googleVisionBarcodeType?: number,
-  googleVisionBarcodeMode?: number,
-  whiteBalance?: number | string | {temperature: number, tint: number, redGainOffset?: number, greenGainOffset?: number, blueGainOffset?: number },
-  faceDetectionLandmarks?: number,
-  autoFocus?: string | boolean | number,
-  autoFocusPointOfInterest?: { x: number, y: number },
-  faceDetectionClassifications?: number,
-  onFacesDetected?: ({ faces: Array<TrackedFaceFeature> }) => void,
-  onTextRecognized?: ({ textBlocks: Array<TrackedTextFeature> }) => void,
-  captureAudio?: boolean,
-  keepAudioSession?: boolean,
-  useCamera2Api?: boolean,
-  playSoundOnCapture?: boolean,
-  videoStabilizationMode?: number | string,
-  pictureSize?: string,
-  rectOfInterest: Rect,
+    faceDetectionMode ?: number,
+    trackingEnabled ?: boolean,
+    flashMode ?: number | string,
+    exposure ?: number,
+    barCodeTypes ?: Array < string >,
+    googleVisionBarcodeType ?: number,
+    googleVisionBarcodeMode ?: number,
+    whiteBalance ?: number | string | { temperature: number, tint: number, redGainOffset?: number, greenGainOffset?: number, blueGainOffset?: number },
+    faceDetectionLandmarks ?: number,
+    autoFocus ?: string | boolean | number,
+    autoFocusPointOfInterest ?: { x: number, y: number },
+    faceDetectionClassifications ?: number,
+    onFacesDetected ?: ({ faces: Array < TrackedFaceFeature > }) => void,
+      onTextRecognized ?: ({ textBlocks: Array < TrackedTextFeature > }) => void,
+        captureAudio ?: boolean,
+        keepAudioSession ?: boolean,
+        useCamera2Api ?: boolean,
+        playSoundOnCapture ?: boolean,
+        videoStabilizationMode ?: number | string,
+        pictureSize ?: string,
+        rectOfInterest: Rect,
 };
 
 type StateType = {
@@ -312,35 +315,34 @@ const RecordAudioPermissionStatusEnum: {
   NOT_AUTHORIZED: 'NOT_AUTHORIZED',
 };
 
-const CameraManager: Object = NativeModules.RNCameraManager ||
-  NativeModules.RNCameraModule || {
-    stubbed: true,
-    Type: {
-      back: 1,
+const CameraManager: Object = {
+  stubbed: true,
+  Type: {
+    back: 1,
+  },
+  AutoFocus: {
+    on: 1,
+  },
+  FlashMode: {
+    off: 1,
+  },
+  WhiteBalance: {},
+  BarCodeType: {},
+  FaceDetection: {
+    fast: 1,
+    Mode: {},
+    Landmarks: {
+      none: 0,
     },
-    AutoFocus: {
-      on: 1,
+    Classifications: {
+      none: 0,
     },
-    FlashMode: {
-      off: 1,
-    },
-    WhiteBalance: {},
-    BarCodeType: {},
-    FaceDetection: {
-      fast: 1,
-      Mode: {},
-      Landmarks: {
-        none: 0,
-      },
-      Classifications: {
-        none: 0,
-      },
-    },
-    GoogleVisionBarcodeDetection: {
-      BarcodeType: 0,
-      BarcodeMode: 0,
-    },
-  };
+  },
+  GoogleVisionBarcodeDetection: {
+    BarcodeType: 0,
+    BarcodeMode: 0,
+  },
+};
 
 const EventThrottleMs = 500;
 
@@ -426,10 +428,12 @@ export default class Camera extends React.Component<PropsType, StateType> {
     flashMode: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     exposure: PropTypes.number,
     whiteBalance: PropTypes.oneOfType([PropTypes.string, PropTypes.number,
-      PropTypes.shape({ temperature: PropTypes.number, tint: PropTypes.number,
-        redGainOffset: PropTypes.number,
-        greenGainOffset: PropTypes.number,
-        blueGainOffset: PropTypes.number })]),
+    PropTypes.shape({
+      temperature: PropTypes.number, tint: PropTypes.number,
+      redGainOffset: PropTypes.number,
+      greenGainOffset: PropTypes.number,
+      blueGainOffset: PropTypes.number
+    })]),
     autoFocus: PropTypes.oneOfType([PropTypes.string, PropTypes.number, PropTypes.bool]),
     autoFocusPointOfInterest: PropTypes.shape({ x: PropTypes.number, y: PropTypes.number }),
     permissionDialogTitle: PropTypes.string,
@@ -448,18 +452,16 @@ export default class Camera extends React.Component<PropsType, StateType> {
     rectOfInterest: PropTypes.any,
     defaultVideoQuality: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   };
+  
 
   static defaultProps: Object = {
-    zoom: 0,
     useNativeZoom: false,
-    maxZoom: 0,
     ratio: '4:3',
     focusDepth: 0,
-    type: CameraManager.Type.back,
+    type: "back",
     cameraId: null,
     autoFocus: CameraManager.AutoFocus.on,
     flashMode: CameraManager.FlashMode.off,
-    exposure: -1,
     whiteBalance: CameraManager.WhiteBalance.auto,
     faceDetectionMode: (CameraManager.FaceDetection || {}).fast,
     barCodeTypes: Object.values(CameraManager.BarCodeType),
@@ -492,7 +494,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     mirrorVideo: false,
   };
 
-  _cameraRef: ?Object;
+  _cameraRef: React.ElementRef<typeof NativeCamera> | null = null
   _cameraHandle: ?number;
   _lastEvents: { [string]: string };
   _lastEventsTimes: { [string]: Date };
@@ -539,12 +541,29 @@ export default class Camera extends React.Component<PropsType, StateType> {
       throw 'Camera handle cannot be null';
     }
 
-    return await CameraManager.takePicture(options, this._cameraHandle);
+    if (!this._cameraRef) {
+      throw 'Camera handle cannot be null';
+    }
+
+    return new Promise((resolve, reject) => {
+      try {
+        const onCodeScannedListener = DeviceEventEmitter.addListener('onTaskPhoto', (data) => {
+          resolve(data);
+          onCodeScannedListener.remove();
+        });
+
+        reactCameraCommands.takePicture(this._cameraRef, options)
+      }
+      catch (e) {
+        reject(e);
+        return;
+      }
+    });
   }
 
   async getSupportedRatiosAsync() {
     if (Platform.OS === 'android') {
-      return await CameraManager.getSupportedRatios(this._cameraHandle);
+      return await reactCameraCommands.getSupportedRatios(this._cameraHandle);
     } else {
       throw new Error('Ratio is not supported on iOS');
     }
@@ -553,14 +572,25 @@ export default class Camera extends React.Component<PropsType, StateType> {
   async getCameraIdsAsync() {
     if (Platform.OS === 'android') {
       return await CameraManager.getCameraIds(this._cameraHandle);
-    } else {
-      return await CameraManager.getCameraIds(); // iOS does not need a camera instance
+    } else if (Platform.OS === 'ios') {
+      return await CameraNativeCameraModuleManager.getCameraIds(); // iOS does not need a camera instance
+    } else if (Platform.OS === 'harmony') {
+      return new Promise(async (resolve, reject) => {
+        try {
+          let data = await NativeCameraModule.getCameraIds();
+          resolve(data)
+        }
+        catch (e) {
+          reject(e);
+          return;
+        }
+      });;
     }
   }
 
   getSupportedPreviewFpsRange = async (): Promise<[]> => {
     if (Platform.OS === 'android') {
-      return await CameraManager.getSupportedPreviewFpsRange(this._cameraHandle);
+      return await reactCameraCommands.getSupportedPreviewFpsRange(this._cameraHandle);
     } else {
       throw new Error('getSupportedPreviewFpsRange is not supported on iOS');
     }
@@ -568,7 +598,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
 
   getAvailablePictureSizes = async (): string[] => {
     //$FlowFixMe
-    return await CameraManager.getAvailablePictureSizes(this.props.ratio, this._cameraHandle);
+    return await NativeCameraModule.getAvailablePictureSizes();
   };
 
   async recordAsync(options?: RecordingOptions) {
@@ -616,32 +646,78 @@ export default class Camera extends React.Component<PropsType, StateType> {
         console.warn('Recording with audio not possible. Permissions are missing.');
       }
     }
+    if (!this._cameraRef) {
+      throw 'Camera handle cannot be null';
+    }
 
-    return await CameraManager.record(options, this._cameraHandle);
+    return new Promise((resolve, reject) => {
+      try {
+        const onRecordingFinishedListener = DeviceEventEmitter.addListener('onRecordingFinished', (video: RecordResponse) => {
+          resolve(video)
+          onRecordingFinishedListener.remove();
+        });
+        reactCameraCommands.record(this._cameraRef, options)
+      }
+      catch (e) {
+        reject(e);
+        return;
+      }
+    });
   }
 
   stopRecording() {
-    CameraManager.stopRecording(this._cameraHandle);
+    if (!this._cameraRef) {
+      throw 'Camera handle cannot be null';
+    }
+    reactCameraCommands.stopRecording(this._cameraRef);
   }
 
   pauseRecording() {
-    CameraManager.pauseRecording(this._cameraHandle);
+    if (!this._cameraRef) {
+      throw 'Camera handle cannot be null';
+    }
+    reactCameraCommands.pauseRecording(this._cameraRef);
   }
 
   resumeRecording() {
-    CameraManager.resumeRecording(this._cameraHandle);
+    if (!this._cameraRef) {
+      throw 'Camera handle cannot be null';
+    }
+    reactCameraCommands.resumeRecording(this._cameraRef);
   }
 
   pausePreview() {
-    CameraManager.pausePreview(this._cameraHandle);
+    if (!this._cameraRef) {
+      throw 'Camera handle cannot be null';
+    }
+
+    reactCameraCommands.pausePreview(this._cameraRef);
   }
 
   isRecording() {
-    return CameraManager.isRecording(this._cameraHandle);
+    if (!this._cameraRef) {
+      throw 'Camera handle cannot be null';
+    }
+    return new Promise((resolve, reject) => {
+      try {
+        const isRecordingFinishedListener = DeviceEventEmitter.addListener('isRecording', (isRecording) => {
+          resolve(isRecording)
+          isRecordingFinishedListener.remove();
+        });
+        reactCameraCommands.isRecording(this._cameraRef)
+      }
+      catch (e) {
+        reject(e);
+        return;
+      }
+    });
   }
 
   resumePreview() {
-    CameraManager.resumePreview(this._cameraHandle);
+    if (!this._cameraRef) {
+      throw 'Camera handle cannot be null';
+    }
+    reactCameraCommands.resumePreview(this._cameraRef);
   }
 
   _onMountError = ({ nativeEvent }: EventCallbackArgumentsType) => {
@@ -666,7 +742,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
       this.props.onTap(nativeEvent.touchOrigin);
     }
     if (this.props.onDoubleTap && nativeEvent.isDoubleTap) {
-      this.props.onTap(nativeEvent.touchOrigin);
+      this.props.onDoubleTap(nativeEvent.touchOrigin);
     }
   };
   _onAudioConnected = () => {
@@ -831,10 +907,18 @@ export default class Camera extends React.Component<PropsType, StateType> {
     if (this.state.isAuthorized || this.hasFaCC()) {
       return (
         <View style={style}>
-          <RNCamera
+          <NativeCamera
             {...nativeProps}
+            videoStabilizationMode = {this.props.videoStabilizationMode}
+            autoFocus={this.props.autoFocus}
+            whiteBalance={this.props.whiteBalance}
+            flashMode={this.props.flashMode}
+            type={this.props.type}
             style={StyleSheet.absoluteFill}
-            ref={this._setReference}
+            ref={(ref) => {
+              this._cameraRef = ref;
+              this._cameraHandle = findNodeHandle(ref);
+            }}
             onMountError={this._onMountError}
             onCameraReady={this._onCameraReady}
             onAudioInterrupted={this._onAudioInterrupted}
@@ -899,30 +983,3 @@ export default class Camera extends React.Component<PropsType, StateType> {
 }
 
 export const Constants = Camera.Constants;
-
-const RNCamera = requireNativeComponent('RNCamera', Camera, {
-  nativeOnly: {
-    accessibilityComponentType: true,
-    accessibilityLabel: true,
-    accessibilityLiveRegion: true,
-    barCodeScannerEnabled: true,
-    touchDetectorEnabled: true,
-    googleVisionBarcodeDetectorEnabled: true,
-    faceDetectorEnabled: true,
-    textRecognizerEnabled: true,
-    importantForAccessibility: true,
-    onBarCodeRead: true,
-    onGoogleVisionBarcodesDetected: true,
-    onCameraReady: true,
-    onAudioInterrupted: true,
-    onAudioConnected: true,
-    onPictureSaved: true,
-    onFaceDetected: true,
-    onTouch: true,
-    onLayout: true,
-    onMountError: true,
-    onSubjectAreaChanged: true,
-    renderToHardwareTextureAndroid: true,
-    testID: true,
-  },
-});

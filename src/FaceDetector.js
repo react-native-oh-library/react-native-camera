@@ -1,9 +1,9 @@
 // @flow
-import { NativeModules } from 'react-native';
+import  NativeTurboModule from './NativeFaceDetector';
 
 const faceDetectionDisabledMessage = 'Face detection has not been included in this build.';
 
-const FaceDetectorModule: Object = NativeModules.RNFaceDetector || {
+const FaceDetectorModule: Object = NativeTurboModule || {
   stubbed: true,
   Mode: {},
   Landmarks: {},

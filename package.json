@@ -1,5 +1,5 @@
 {
-  "name": "react-native-camera",
+  "name": "@react-native-oh-tpl/react-native-camera",
   "description": "A Camera component for React Native. Also reads barcodes.",
   "version": "3.40.0",
   "author": "Lochlan Wansbrough <lochie@live.com> (http://lwansbrough.com)",
@@ -36,7 +36,11 @@
     "prettier": "^2.1.1",
     "react": "16.13.1",
     "react-native": "0.63.2",
-    "semantic-release": "^17.1.1"
+    "semantic-release": "^17.1.1",
+    "@rnoh/react-native-harmony-cli": "npm:@react-native-oh/react-native-harmony-cli@^0.0.27",
+    "@react-native-community/cli": "11.3.6",
+    "metro": "0.82.5",
+    "memfs": "4.17.2"
   },
   "homepage": "https://github.com/react-native-community/react-native-camera",
   "keywords": [
@@ -77,7 +81,8 @@
     "lint": "eslint src --max-warnings=0",
     "lint:staged": "lint-staged",
     "prettier": "prettier --write",
-    "ci:publish": "semantic-release"
+    "ci:publish": "semantic-release",
+    "codegen-lib": "react-native codegen-lib-harmony --no-safety-check --npm-package-name react-native-camera --cpp-components-spec-paths ./src --turbo-modules-spec-paths ./src --cpp-output-path ./harmony/reactNativeCamera/src/main/cpp/generated --ets-output-path ./harmony/reactNativeCamera/src/main/ets/generated"
   },
   "types": "types/index.d.ts",
   "release": {
@@ -102,6 +107,9 @@
         }
       ]
     ]
+  },
+  "harmony": {
+    "alias": "react-native-camera"
   },
   "config": {
     "commitizen": {
