@@ -305,7 +305,7 @@ export struct ReactCameraView {
       this.cameraSession.setWhiteBalance(descriptor.props.whiteBalance)
     }
 
-    if (descriptor.props.autoFocus === "on") {
+    if (descriptor.props.autoFocus === "on" || descriptor.props.autoFocus === 1) {
       Logger.debug("autoFocus" + descriptor.props.autoFocus)
       this.focusMode = camera.FocusMode.FOCUS_MODE_AUTO
       this.cameraSession.focus(this.focusMode, { x: 480, y: 860 });
@@ -569,7 +569,7 @@ export struct ReactCameraView {
     let scanResult: ScanResult | Array<scanBarcode.ScanResult> | undefined = undefined;
     const isActive = this.descriptorWrapper['rawProps'].isActive;
     try {
-      this.scanSession.scanStart(this.surfaceId,
+      this.scanSession.scanStart(this.surfaceId, this.zoom,
         { width: this.localDisplayWidth, height: this.localDisplayHeight }, isFirst, isActive,
         (error: BusinessError, result: Array<scanBarcode.ScanResult>) => {
           if (error) {
@@ -810,42 +810,8 @@ export struct ReactCameraView {
               Logger.debug("usenativezoom")
               if (this.useNativeZoom) {
                 Logger.debug("usenativezoom" + this.scaleValue)
-                this.cameraSession.setSmoothZoom(this.scaleValue);
-              }
-            }), TapGesture({ count: 1 })
-            .onAction((event: GestureEvent) => {
-              if (event) {
-                let tapCallback = new TapCallBack();
-                tapCallback.isDoubleTap = false;
-                if (event.fingerList[0]) {
-                  tapCallback.touchOrigin.x = event.fingerList[0].displayX;
-                  tapCallback.touchOrigin.y = event.fingerList[0].displayY;
-                  if (this.cameraState === cameraState.PHOTO) {
-                    this.cameraSession.focus(this.focusMode,
-                      { x: vp2px(event.fingerList[0].displayX), y: vp2px(event.fingerList[0].displayY) } as Point)
-                  }
-                  this.ctx.rnInstance.emitComponentEvent(
-                    this.tag,
-                    VisionCameraViewSpec.NAME, {
-                    type: 'onTouch',
-                    tapCallback: tapCallback
-                  })
-                }
-              }
-            }), TapGesture({ count: 2 })
-            .onAction((event: GestureEvent) => {
-              if (event) {
-                let tapCallback = new TapCallBack();
-                tapCallback.isDoubleTap = true;
-                if (event.fingerList[0]) {
-                  tapCallback.touchOrigin.x = event.fingerList[0].displayX;
-                  tapCallback.touchOrigin.y = event.fingerList[0].displayY;
-                  this.ctx.rnInstance.emitComponentEvent(
-                    this.tag,
-                    VisionCameraViewSpec.NAME, {
-                    type: 'onTouch',
-                    tapCallback: tapCallback
-                  })
+                if (this.cameraState === cameraState.PHOTO || this.cameraState === cameraState.VIDEO) {
+                  this.cameraSession?.setNativeSmoothZoom(this.scaleValue);
                 }
               }
             }))

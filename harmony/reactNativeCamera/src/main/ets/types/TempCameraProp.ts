@@ -41,7 +41,7 @@ export class TempCameraProps {
   scrollGesturesEnabled: boolean = false; //是否允许拖动
   mapType: number = 0;
   showsUserLocation: boolean = false;
-  autoFocus: string = "";
+  autoFocus: string | number = "";
   autoFocusPointOfInterest: FocusPoint = null;
   pictureSize: string = "";
   type: string = "back";

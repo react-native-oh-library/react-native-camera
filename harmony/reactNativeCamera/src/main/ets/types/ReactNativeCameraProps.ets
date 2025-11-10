@@ -43,7 +43,7 @@ export interface ReactNativeCameraProps extends ViewBaseProps {
   scrollGesturesEnabled: boolean, //是否允许拖动
   mapType: number,
   showsUserLocation: boolean,
-  autoFocus: string,
+  autoFocus: string | number,
   autoFocusPointOfInterest: FocusPoint,
   pictureSize: string,
   type: string,
