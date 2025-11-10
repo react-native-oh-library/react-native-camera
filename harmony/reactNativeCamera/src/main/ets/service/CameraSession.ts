@@ -342,6 +342,14 @@ export default class CameraSession {
     if (props.captureAudio != undefined) {
       this.setAudio(props.captureAudio);
     }
+
+    if (props.autoFocus === "on" || props.autoFocus === 1) {
+      this.focus(camera.FocusMode.FOCUS_MODE_AUTO, { x: 480, y: 860 });
+    } else if (props.autoFocus != "on" && props.focusDepth) {
+      this.focus(camera.FocusMode.FOCUS_MODE_AUTO, { x: props.focusDepth * 90, y: props.focusDepth * 160 })
+    } else {
+      this.focus(camera.FocusMode.FOCUS_MODE_MANUAL);
+    }
   }
 
   public setWhiteBalance(whiteBalance: string) {
@@ -807,6 +815,22 @@ export default class CameraSession {
       this.photoSession?.setSmoothZoom(zoom, camera.SmoothZoomMode.NORMAL);
       this.photoPreviewScale = zoom;
       Logger.debug(`RNOH in setSmoothZoom success`);
+    } catch (error) {
+      Logger.error(TAG, `The setSmoothZoom call failed. error code: ${error.code}.`);
+    }
+  }
+
+  //设置缩放[0.49,50]
+  setNativeSmoothZoom(zoom: number): void {
+    try {
+      const [min, max]: Array<number> = this.getZoomRange();
+      if (zoom <= min) {
+        zoom = min;
+      } else if (zoom >= max) {
+        zoom = max;
+      }
+      this.photoSession?.setSmoothZoom(zoom, camera.SmoothZoomMode.NORMAL);
+      this.photoPreviewScale = zoom;
     } catch (error) {
       Logger.error(TAG, `The setSmoothZoom call failed. error code: ${error.code}.`);
     }
