@@ -111,6 +111,10 @@
   "harmony": {
     "alias": "react-native-camera"
   },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
   "config": {
     "commitizen": {
       "path": "@commitlint/prompt"
