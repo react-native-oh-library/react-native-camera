@@ -53,7 +53,7 @@ export default class ScanSession {
   /**
    * 启动相机进行扫码
    */
-  async scanStart(surfaceId: string, SurfaceRect, isFirst: boolean, isAction: boolean,
+  async scanStart(surfaceId: string, zoom: number, SurfaceRect, isFirst: boolean, isAction: boolean,
     callback: AsyncCallback<Array<scanBarcode.ScanResult>>): Promise<void> {
     if (this.isScanEnd) {
       this.setEndStatus(false)
