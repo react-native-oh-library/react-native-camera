@@ -8,7 +8,7 @@
   "name": "@react-native-ohos/react-native-camera",
   "description": "Please describe the basic information.",
   "main": "index.ets",
-  "version": "3.40.1-rc.3",
+  "version": "3.40.1-rc.4",
   "dependencies": {
     "@rnoh/react-native-openharmony": "0.72.90",
     "@ohos/mp4parser": "^2.0.6"
