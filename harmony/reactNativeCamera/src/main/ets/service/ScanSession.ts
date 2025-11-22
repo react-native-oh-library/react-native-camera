@@ -108,6 +108,9 @@ export default class ScanSession {
           case scanCore.ScanType.AZTEC_CODE:
             code = "aztec";
             break;
+          case scanCore.ScanType.CODABAR_CODE:
+            code = "code_bar";
+            break;
           case scanCore.ScanType.CODE128_CODE:
             code = "code128";
             break;
@@ -131,10 +134,21 @@ export default class ScanSession {
             break;
           case scanCore.ScanType.UPC_E_CODE:
             code = "upc_e";
+            break;
           case scanCore.ScanType.ITF14_CODE:
             code = "itf14";
+            break;
+          case scanCore.ScanType.UPC_A_CODE:
+            code = "upc_a"
+            break;
+          case scanCore.ScanType.MULTIFUNCTIONAL_CODE:
+            code = "multifunctional_code"
+            break;
           case scanCore.ScanType.DATAMATRIX_CODE:
             code = "datamatrix";
+            break;
+          default:
+            code = "unknown"
             break;
         }
       })
