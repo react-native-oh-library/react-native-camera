@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "@react-native-ohos/react-native-camera",
   "description": "A Camera component for React Native. Also reads barcodes.",
   "version": "3.40.1",
