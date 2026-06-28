@@ -625,8 +625,6 @@ export default class CameraSession {
     }
     if (options.mute) {
       this.hasAudio = false
-    } else {
-      this.hasAudio = true
     }
 
     if (options.fps) {
