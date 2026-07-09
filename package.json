@@ -113,7 +113,13 @@
     "access": "public"
   },
   "harmony": {
-    "alias": "react-native-camera"
+    "alias": "react-native-camera",
+    "autolinking": {
+      "ohPackageName": "@react-native-ohos/react-native-camera",
+      "etsPackageClassName": "ReactNativeCameraPackage",
+      "cppPackageClassName": "NativeCameraPackage",
+      "cmakeLibraryTargetName": "rnoh_native_camera"
+    }
   },
   "config": {
     "commitizen": {

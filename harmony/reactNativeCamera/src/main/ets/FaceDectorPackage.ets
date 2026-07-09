@@ -22,7 +22,8 @@
  * SOFTWARE.
  */
 
-import { RNPackage, TurboModulesFactory } from '@rnoh/react-native-openharmony/ts';
+import { TurboModulesFactory } from '@rnoh/react-native-openharmony/ts';
+import { RNOHPackage } from '@rnoh/react-native-openharmony';
 import type { TurboModule, TurboModuleContext } from '@rnoh/react-native-openharmony/ts';
 import { FaceDectorTurboModule } from './FaceDectorTurboModule';
 
@@ -39,7 +40,7 @@ class FaceDectorTurboModulesFactory extends TurboModulesFactory {
   }
 }
 
-export class FaceDectorPackage extends RNPackage {
+export class FaceDectorPackage extends RNOHPackage {
   createTurboModulesFactory(ctx: TurboModuleContext): TurboModulesFactory {
     return new FaceDectorTurboModulesFactory(ctx);
   }
