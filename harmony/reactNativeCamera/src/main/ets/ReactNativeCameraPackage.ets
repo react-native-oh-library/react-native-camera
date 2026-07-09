@@ -22,24 +22,29 @@
  * SOFTWARE.
  */
 
-import { RNPackage, TurboModulesFactory } from '@rnoh/react-native-openharmony/ts';
+import { TurboModulesFactory } from '@rnoh/react-native-openharmony/ts';
+import { RNOHPackage } from '@rnoh/react-native-openharmony';
 import type { TurboModule, TurboModuleContext } from '@rnoh/react-native-openharmony/ts';
 import { ReactNativeCameraTurboModule } from './ReactNativeCameraTurboModule';
+import { FaceDectorTurboModule } from './FaceDectorTurboModule';
 
 class ReactNativeCameraTurboModulesFactory extends TurboModulesFactory {
   createTurboModule(name: string): TurboModule | null {
     if (name === 'RNCCameraModule') {
       return new ReactNativeCameraTurboModule(this.ctx);
     }
+    if (name === 'RNCFaceDector') {
+      return new FaceDectorTurboModule(this.ctx);
+    }
     return null;
   }
 
   hasTurboModule(name: string): boolean {
-    return name === 'RNCCameraModule';
+    return name === 'RNCCameraModule' || name === 'RNCFaceDector';
   }
 }
 
-export class ReactNativeCameraPackage extends RNPackage {
+export class ReactNativeCameraPackage extends RNOHPackage {
   createTurboModulesFactory(ctx: TurboModuleContext): TurboModulesFactory {
     return new ReactNativeCameraTurboModulesFactory(ctx);
   }

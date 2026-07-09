@@ -23,3 +23,4 @@
  */
 export * from "./ts"
 export * from "./src/main/ets/ReactCameraView"
+export { ReactNativeCameraPackage as default } from "./src/main/ets/ReactNativeCameraPackage"
