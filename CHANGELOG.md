@@ -1,5 +1,10 @@
 [**THE CHANGELOG OF FURTHER VERSIONS (STARTING WITH 1.4.0) IS MAINTAINED WITH GITHUB RELEASES AND CAN BE FOUND HERE**](https://github.com/react-native-community/react-native-camera/releases)
 
+#### 3.42.0-rc.2
+
+* pre-release version 3.42.0-rc.2
+* 修复setCaptureAudio: false没有生效问题
+
 #### 3.42.0-rc.1
 
 * 82适配支持autolinking
