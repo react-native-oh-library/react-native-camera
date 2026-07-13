@@ -623,10 +623,12 @@ export default class CameraSession {
     } else {
       this.hasAudio = false
     }
-    if (options.mute) {
-      this.hasAudio = false
-    } else {
-      this.hasAudio = true
+    if (options.mute !== undefined) {
+      if (options.mute) {
+        this.hasAudio = false
+      } else {
+        this.hasAudio = true
+      }
     }
 
     if (options.fps) {

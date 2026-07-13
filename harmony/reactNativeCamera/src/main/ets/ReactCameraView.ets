@@ -360,7 +360,7 @@ export struct ReactCameraView {
     const permissions: Permissions[] = [
       'ohos.permission.CAMERA',
     ]
-    if (props.captureAudio = true) {
+    if (props.captureAudio === true) {
       permissions.push('ohos.permission.MICROPHONE')
     }
     try {
