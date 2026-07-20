@@ -3,6 +3,12 @@
 ## Docs
 Follow our docs here [https://react-native-community.github.io/react-native-camera/](https://react-native-community.github.io/react-native-camera/)
 
+HarmonyOS 文档：
+
+[中文](https://gitcode.com/CPF-RN/usage-docs/blob/master/zh-cn/react-native-camera.md)
+
+[English](https://gitcode.com/CPF-RN/usage-docs/blob/master/en/react-native-camera.md)
+
 ## Sponsors
 
 If you use this library on your commercial/personal projects, you can help us by funding the work on specific issues that you choose by using IssueHunt.io!
