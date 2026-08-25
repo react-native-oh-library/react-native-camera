@@ -97,6 +97,7 @@ export struct ReactCameraView {
   @State componentWidth: number = 0;
   @State componentHeight: number = 0;
   private timer = 0
+  private isCustomScanStopped: boolean = false;
   private enableZoomGesture: boolean | undefined = undefined;
   private prevProps: VisionCameraViewSpec.RawProps | undefined = undefined;
   private currentProps: VisionCameraViewSpec.RawProps = {} as VisionCameraViewSpec.RawProps;
@@ -404,6 +405,7 @@ export struct ReactCameraView {
     )
     this.callbackList.push(this.ctx.rnInstance.subscribeToLifecycleEvents("BACKGROUND", async () => {
       if (this.cameraState === cameraState.SCAN) {
+        this.isCustomScanStopped = true
         clearTimeout(this.timer)
         await this.scanSession.scanStop();
         this.scanSession.scanRelease();
@@ -429,12 +431,15 @@ export struct ReactCameraView {
         if (props.isActive) {
           this.scanStart(true);
         } else {
+          this.isCustomScanStopped = true
           this.scanSession.scanStop();
           this.scanSession.setEndStatus(true);
         }
       }
       if (props.torch !== undefined && this.prevProps?.torch !== props.torch) {
-        this.scanSession.setTorch(props.torch);
+        if (!this.isCustomScanStopped) {
+          this.scanSession.setTorch(props.torch);
+        }
       }
     }
     this.prevProps = props;
@@ -443,6 +448,7 @@ export struct ReactCameraView {
   async aboutToDisappear() {
     this.cleanUpCallbacks.forEach(cb => cb())
     if (this.cameraState === cameraState.SCAN) {
+      this.isCustomScanStopped = true
       clearTimeout(this.timer)
       await this.scanSession.scanStop();
       this.scanSession.scanRelease();
@@ -566,6 +572,7 @@ export struct ReactCameraView {
 
   async scanStart(isFirst?: boolean) {
     clearTimeout(this.timer)
+    this.isCustomScanStopped = false
     let scanResult: ScanResult | Array<scanBarcode.ScanResult> | undefined = undefined;
     const isActive = this.descriptorWrapper['rawProps'].isActive;
     try {
@@ -587,7 +594,14 @@ export struct ReactCameraView {
               data: callbackResult
             })
           }
-          customScan.rescan();
+          if (!this.isCustomScanStopped) {
+            try {
+              customScan.rescan();
+            } catch (error) {
+              // rescan 在 stop/release 后调用会抛 1000500001,吞掉避免 jscrash
+              Logger.error(TAG, `rescan failed, error: ${JSON.stringify(error)}`)
+            }
+          }
         });
     } catch (error) {
       if (error.code === '1000500001') {
