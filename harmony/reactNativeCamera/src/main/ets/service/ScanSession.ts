@@ -215,13 +215,17 @@ export default class ScanSession {
 
   setTorch(torch: string) {
     let isTorch: boolean = torch === 'on';
-    let status = customScan.getFlashLightStatus();
-    if (status !== isTorch) {
-      if (isTorch) {
-        customScan.openFlashLight();
-      } else {
-        customScan.closeFlashLight();
+    try {
+      let status = customScan.getFlashLightStatus();
+      if (status !== isTorch) {
+        if (isTorch) {
+          customScan.openFlashLight();
+        } else {
+          customScan.closeFlashLight();
+        }
       }
+    } catch (error) {
+      Logger.error(TAG, `setTorch failed, error: ${JSON.stringify(error)}`)
     }
   }
 
