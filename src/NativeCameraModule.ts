@@ -11,6 +11,10 @@ export interface Spec extends TurboModule {
   getAuidPermission(): Promise<boolean>;
   getCameraIds():Promise<CameraId[]>;
   getAvailablePictureSizes():Promise<string[]>;
+  hasTorch():Promise<boolean>;
+  checkIfVideoIsValid(path: string): Promise<boolean>;
+  getSupportedPreviewFpsRange(handle: number): Promise<string[]>;
+  getSupportedRatios(handle: number): Promise<string[]>;
 }
 
 export default TurboModuleRegistry.get<Spec>('RNCCameraModule');

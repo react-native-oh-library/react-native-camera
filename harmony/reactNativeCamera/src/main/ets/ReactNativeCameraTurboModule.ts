@@ -1,26 +1,18 @@
-/**
- * MIT License
+/*
+ * Copyright (c) 2026 Huawei Device Co., Ltd.
+ * Licensed under the MIT License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
- * Copyright (C) 2023 Huawei Device Co., Ltd.
+ *     https://github.com/react-native-camera/react-native-camera/blob/v4.2.1/LICENSE
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 
 
 import type { TurboModuleContext } from '@rnoh/react-native-openharmony/ts';
@@ -33,6 +25,8 @@ import Logger from './Logger';
 import { SimpleCameraDeviceInfo } from './core/CameraDeviceInfo';
 import { camera } from '@kit.CameraKit';
 import { AuthType } from './types/AuthType';
+import { media } from '@kit.MediaKit';
+import fs from '@ohos.file.fs';
 
 const TAG: string = '[RNOH]ReactNativeCameraTurboModule'
 
@@ -158,10 +152,24 @@ export class ReactNativeCameraTurboModule extends TurboModule {
         let temp = new SimpleCameraDeviceInfo();
         temp.id = camerasArrayTemp[i].cameraId;
         temp.type = camerasArrayTemp[i].cameraType;
+        temp.deviceType = this.getDeviceType(camerasArrayTemp[i].cameraType);
         data.push(temp)
       }
       resolve(data)
     });
+  }
+
+  private getDeviceType(cameraType: camera.CameraType): string {
+    switch (cameraType) {
+      case camera.CameraType.CAMERA_TYPE_ULTRA_WIDE:
+        return 'AVCaptureDeviceTypeBuiltInUltraWideCamera';
+      case camera.CameraType.CAMERA_TYPE_WIDE_ANGLE:
+        return 'AVCaptureDeviceTypeBuiltInWideAngleCamera';
+      case camera.CameraType.CAMERA_TYPE_TELEPHOTO:
+        return 'AVCaptureDeviceTypeBuiltInTelephotoCamera';
+      default:
+        return 'AVCaptureDeviceTypeBuiltInWideAngleCamera';
+    }
   }
 
   getAvailablePictureSizes(): Promise<string[]> {
@@ -180,6 +188,120 @@ export class ReactNativeCameraTurboModule extends TurboModule {
         data[i] = capability.photoProfiles[i].size.width + "x" + capability.photoProfiles[i].size.height
       }
       resolve(data)
+    });
+  }
+
+  hasTorch(): Promise<boolean> {
+    Logger.debug("hasTorch")
+    return new Promise((resolve, reject) => {
+      try {
+        let cameraManager = camera.getCameraManager(this.ctx.getUIContext().getHostContext());
+        let isSupported: boolean = cameraManager.isTorchModeSupported(camera.TorchMode.ON);
+        resolve(isSupported)
+      } catch (err) {
+        let businessError = err as BusinessError;
+        Logger.error(TAG, `hasTorch failed, code: ${businessError.code}, message: ${businessError.message}`);
+        reject(businessError)
+      }
+    });
+  }
+
+  checkIfVideoIsValid(path: string): Promise<boolean> {
+    Logger.debug("checkIfVideoIsValid")
+    return new Promise(async (resolve, reject) => {
+      let fileExists = fs.accessSync(path);
+      if (!fileExists) {
+        resolve(false)
+        return;
+      }
+      let avMetadataExtractor: media.AVMetadataExtractor = await media.createAVMetadataExtractor();
+      let file = fs.openSync(path, fs.OpenMode.READ_ONLY);
+      avMetadataExtractor.fdSrc = {
+        fd: file.fd
+      }
+      avMetadataExtractor.fetchMetadata().then((metadata) => {
+        if (metadata.duration.length > 0 && parseInt(metadata.duration) > 0) {
+          resolve(true)
+        } else {
+          resolve(false)
+        }
+      }).catch((err: BusinessError) => {
+        Logger.error(TAG, `checkIfVideoIsValid fetchMetadata failed, code: ${err.code}, message: ${err.message}`);
+        resolve(false)
+      }).finally(() => {
+        avMetadataExtractor.release();
+        fs.closeSync(file);
+      });
+    });
+  }
+
+  getSupportedPreviewFpsRange(handle: number): Promise<string[]> {
+    Logger.debug("getSupportedPreviewFpsRange")
+    return new Promise(async (resolve, reject) => {
+      try {
+        let cameraManager = camera.getCameraManager(this.ctx.getUIContext().getHostContext());
+        let camerasArray = cameraManager?.getSupportedCameras();
+        if (!camerasArray) {
+          Logger.error(TAG, 'getSupportedPreviewFpsRange cannot get cameras');
+          reject('getSupportedPreviewFpsRange cannot get cameras')
+          return;
+        }
+        let deviceIndex = handle >= 0 && handle < camerasArray.length ? handle : 0;
+        let capability =
+          cameraManager.getSupportedOutputCapability(camerasArray[deviceIndex], camera.SceneMode.NORMAL_VIDEO);
+        let data: string[] = [];
+        for (let i = 0; i < capability.videoProfiles.length; i++) {
+          let fpsRange = capability.videoProfiles[i].frameRateRange;
+          data.push(`${fpsRange.min},${fpsRange.max}`)
+        }
+        resolve(data)
+      } catch (err) {
+        let businessError = err as BusinessError;
+        Logger.error(TAG,
+          `getSupportedPreviewFpsRange failed, code: ${businessError.code}, message: ${businessError.message}`);
+        reject(businessError)
+      }
+    });
+  }
+
+  getSupportedRatios(handle: number): Promise<string[]> {
+    Logger.debug("getSupportedRatios")
+    return new Promise(async (resolve, reject) => {
+      try {
+        let cameraManager = camera.getCameraManager(this.ctx.getUIContext().getHostContext());
+        let camerasArray = cameraManager?.getSupportedCameras();
+        if (!camerasArray) {
+          Logger.error(TAG, 'getSupportedRatios cannot get cameras');
+          reject('getSupportedRatios cannot get cameras')
+          return;
+        }
+        let deviceIndex = handle >= 0 && handle < camerasArray.length ? handle : 0;
+        let capability =
+          cameraManager.getSupportedOutputCapability(camerasArray[deviceIndex], camera.SceneMode.NORMAL_VIDEO);
+        let data: string[] = [];
+        for (let i = 0; i < capability.previewProfiles.length; i++) {
+          let w = capability.previewProfiles[i].size.width;
+          let h = capability.previewProfiles[i].size.height;
+          // 辗转相除化简为最简整数比，与 Android 上游 "4:3"/"16:9" 输出格式对齐
+          let a = w;
+          let b = h;
+          while (b !== 0) {
+            let t = b;
+            b = a % b;
+            a = t;
+          }
+          let ratio = (w / a) + ':' + (h / a);
+          if (!data.includes(ratio)) {
+            data.push(ratio);
+          }
+        }
+        resolve(data)
+      } catch (err) {
+        let businessError = err as BusinessError;
+        Logger.error(TAG,
+          `getSupportedRatios failed, code: ${businessError.code}, message: ${businessError.message}`);
+        reject(businessError)
+      }
     });
   }
 }

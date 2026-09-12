@@ -111,6 +111,8 @@ type PictureOptions = {
   fixOrientation?: boolean,
   forceUpOrientation?: boolean,
   pauseAfterCapture?: boolean,
+  imageType?: 'jpeg' | 'png',
+  path?: string,
 };
 
 type TrackedFaceFeature = FaceFeature & {
@@ -225,6 +227,17 @@ type Phone = {
   phoneType?: 'UNKNOWN' | 'Work' | 'Home' | 'Fax' | 'Mobile',
 };
 
+type ImageType = {
+  jpeg: any,
+  png: any,
+};
+
+type HardwareCamera = {
+  deviceType?: string,
+  id: string,
+  type: number,
+};
+
 type RecordingOptions = {
   maxDuration?: number,
   maxFileSize?: number,
@@ -286,8 +299,10 @@ type PropsType = typeof View.props & {
         keepAudioSession ?: boolean,
         useCamera2Api ?: boolean,
         playSoundOnCapture ?: boolean,
+        playSoundOnRecord ?: boolean,
         videoStabilizationMode ?: number | string,
         pictureSize ?: string,
+        cameraId ?: string,
         rectOfInterest: Rect,
 };
 
@@ -318,15 +333,27 @@ const RecordAudioPermissionStatusEnum: {
 const CameraManager: Object = {
   stubbed: true,
   Type: {
-    back: 1,
+    back: 'back',
+    front: 'front',
   },
   AutoFocus: {
-    on: 1,
+    on: 'on',
+    off: 'off',
   },
   FlashMode: {
-    off: 1,
+    off: 'off',
+    on: 'on',
+    torch: 'torch',
+    auto: 'auto',
   },
-  WhiteBalance: {},
+  WhiteBalance: {
+    sunny: 'sunny',
+    cloudy: 'cloudy',
+    shadow: 'shadow',
+    incandescent: 'incandescent',
+    fluorescent: 'fluorescent',
+    auto: 'auto',
+  },
   BarCodeType: {},
   FaceDetection: {
     fast: 1,
@@ -341,6 +368,29 @@ const CameraManager: Object = {
   GoogleVisionBarcodeDetection: {
     BarcodeType: 0,
     BarcodeMode: 0,
+  },
+  VideoQuality: {
+    '2160p': 1,
+    '1080p': 2,
+    '720p': 3,
+    '480p': 4,
+    '4:3': 5,
+  },
+  ImageType: {
+    jpeg: 1,
+    png: 2,
+  },
+  VideoCodec: {},
+  CaptureTarget: {
+    disk: 0,
+  },
+  VideoStabilization: {},
+  Orientation: {
+    auto: 'auto',
+    landscapeLeft: 'landscapeLeft',
+    landscapeRight: 'landscapeRight',
+    portrait: 'portrait',
+    portraitUpsideDown: 'portraitUpsideDown',
   },
 };
 
@@ -361,6 +411,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     AutoFocus: CameraManager.AutoFocus,
     WhiteBalance: CameraManager.WhiteBalance,
     VideoQuality: CameraManager.VideoQuality,
+    ImageType: CameraManager.ImageType,
     VideoCodec: CameraManager.VideoCodec,
     BarCodeType: CameraManager.BarCodeType,
     GoogleVisionBarcodeDetection: CameraManager.GoogleVisionBarcodeDetection,
@@ -446,6 +497,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     keepAudioSession: PropTypes.bool,
     useCamera2Api: PropTypes.bool,
     playSoundOnCapture: PropTypes.bool,
+    playSoundOnRecord: PropTypes.bool,
     videoStabilizationMode: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     pictureSize: PropTypes.string,
     mirrorVideo: PropTypes.bool,
@@ -459,7 +511,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     ratio: '4:3',
     focusDepth: 0,
     type: "back",
-    cameraId: null,
+    cameraId: '',
     autoFocus: CameraManager.AutoFocus.on,
     flashMode: CameraManager.FlashMode.off,
     whiteBalance: CameraManager.WhiteBalance.auto,
@@ -489,8 +541,9 @@ export default class Camera extends React.Component<PropsType, StateType> {
     keepAudioSession: false,
     useCamera2Api: false,
     playSoundOnCapture: false,
+    playSoundOnRecord: false,
     pictureSize: 'None',
-    videoStabilizationMode: 0,
+    videoStabilizationMode: 'off', // harmony: cpp 枚举按字符串解析("off"/"standard"/"cinematic"/"auto")
     mirrorVideo: false,
   };
 
@@ -564,6 +617,8 @@ export default class Camera extends React.Component<PropsType, StateType> {
   async getSupportedRatiosAsync() {
     if (Platform.OS === 'android') {
       return await Commands.getSupportedRatios(this._cameraHandle);
+    } else if (Platform.OS === 'harmony') {
+      return await NativeCameraModule.getSupportedRatios(this._cameraHandle);
     } else {
       throw new Error('Ratio is not supported on iOS');
     }
@@ -573,7 +628,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
     if (Platform.OS === 'android') {
       return await CameraManager.getCameraIds(this._cameraHandle);
     } else if (Platform.OS === 'ios') {
-      return await CameraNativeCameraModuleManager.getCameraIds(); // iOS does not need a camera instance
+      return await CameraManager.getCameraIds(); // iOS does not need a camera instance
     } else if (Platform.OS === 'harmony') {
       return new Promise(async (resolve, reject) => {
         try {
@@ -588,9 +643,21 @@ export default class Camera extends React.Component<PropsType, StateType> {
     }
   }
 
+  static async checkIfVideoIsValid(path) {
+    if (Platform.OS === 'android') {
+      return await CameraManager.checkIfVideoIsValid(path);
+    } else if (Platform.OS === 'harmony') {
+      return await NativeCameraModule.checkIfVideoIsValid(path);
+    } else {
+      return true; // iOS: not implemented
+    }
+  }
+
   getSupportedPreviewFpsRange = async (): Promise<[]> => {
     if (Platform.OS === 'android') {
       return await Commands.getSupportedPreviewFpsRange(this._cameraHandle);
+    } else if (Platform.OS === 'harmony') {
+      return await NativeCameraModule.getSupportedPreviewFpsRange(this._cameraHandle);
     } else {
       throw new Error('getSupportedPreviewFpsRange is not supported on iOS');
     }
@@ -920,7 +987,7 @@ export default class Camera extends React.Component<PropsType, StateType> {
               this._cameraHandle = findNodeHandle(ref);
             }}
             onMountError={this._onMountError}
-            onCameraReady={this._onCameraReady}
+            onCameraReady={this._onObjectDetected(this._onCameraReady)}
             onAudioInterrupted={this._onAudioInterrupted}
             onAudioConnected={this._onAudioConnected}
             onGoogleVisionBarcodesDetected={this._onObjectDetected(
@@ -983,3 +1050,10 @@ export default class Camera extends React.Component<PropsType, StateType> {
 }
 
 export const Constants = Camera.Constants;
+
+export function hasTorch() {
+  if (Platform.OS === 'harmony') {
+    return NativeCameraModule.hasTorch();
+  }
+  return CameraManager.hasTorch();
+}

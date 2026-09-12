@@ -290,6 +290,7 @@ type FlashMode = 'on' | 'off' | 'torch' | 'auto';
 export interface NativeProps extends ViewProps {
   autoFocus?: WithDefault<AutoFocusMode, 'on'>,
   autoFocusPointOfInterest?: { x: Int32, y: Int32 },
+  cameraId?: string,
   pictureSize?: string,
   type?: WithDefault<CameraType, 'back'>,
   flashMode?: WithDefault<FlashMode, "auto">,
@@ -315,6 +316,7 @@ export interface NativeProps extends ViewProps {
   videoStabilizationMode?: WithDefault<VideoStabilizationMode, "auto">,
   whiteBalance?: WithDefault<WhiteBalance, "auto">,
   playSoundOnCapture?: boolean,
+  playSoundOnRecord?: boolean,
   barCodeScannerEnabled: boolean,
   touchDetectorEnabled: boolean,
   googleVisionBarcodeDetectorEnabled: boolean,
