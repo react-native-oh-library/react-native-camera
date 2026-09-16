@@ -6,9 +6,9 @@
   },
   "author": "",
   "name": "@react-native-ohos/react-native-camera",
-  "description": "Please describe the basic information.",
+  "description": "React Native camera component for OpenHarmony. Supports camera preview, photo capture, video recording, barcode scanning, with flash/focus/white-balance/zoom control.",
   "main": "index.ets",
-  "version": "3.42.1-rc.1",
+  "version": "4.0.0-beta.1",
   "dependencies": {
     "@rnoh/react-native-openharmony": "file:../../node_modules/@react-native-oh/react-native-harmony/react_native_openharmony.har",
     "@ohos/mp4parser": "^2.0.6"

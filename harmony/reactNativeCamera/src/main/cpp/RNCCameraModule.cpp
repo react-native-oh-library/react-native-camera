@@ -13,6 +13,10 @@ RNCCameraModule::RNCCameraModule(const ArkTSTurboModule::Context ctx, const std:
         ARK_ASYNC_METHOD_METADATA(getAuidPermission, 0),
         ARK_ASYNC_METHOD_METADATA(getCameraIds, 0),
         ARK_ASYNC_METHOD_METADATA(getAvailablePictureSizes, 0),
+        ARK_ASYNC_METHOD_METADATA(hasTorch, 0),
+        ARK_ASYNC_METHOD_METADATA(checkIfVideoIsValid, 1),
+        ARK_ASYNC_METHOD_METADATA(getSupportedPreviewFpsRange, 1),
+        ARK_ASYNC_METHOD_METADATA(getSupportedRatios, 1),
     };
 }
 

@@ -1,4 +1,9 @@
 [**THE CHANGELOG OF FURTHER VERSIONS (STARTING WITH 1.4.0) IS MAINTAINED WITH GITHUB RELEASES AND CAN BE FOUND HERE**](https://github.com/react-native-community/react-native-camera/releases)
+
+#### 4.0.0-beta.1
+
+* Adapt to the RN0.84 framework and upgrade the baseline to 4.2.1
+
 #### 3.42.0
 
 * release version 3.42.0

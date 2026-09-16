@@ -1,8 +1,18 @@
 /*
- * Copyright (c) 2024 Huawei Device Co., Ltd. All rights reserved
- * Use of this source code is governed by a MIT license that can be
- * found in the LICENSE file.
+ * Copyright (c) 2026 Huawei Device Co., Ltd.
+ * Licensed under the MIT License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://github.com/react-native-camera/react-native-camera/blob/v4.2.1/LICENSE
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
+
 
 import camera from '@ohos.multimedia.camera';
 import { Descriptor, RNComponentContext, RNViewBase } from '@rnoh/react-native-openharmony';
@@ -118,6 +128,7 @@ export struct ReactCameraView {
   @State isRecording: boolean = false
   @State videoStabilizationMode: string = ""
   @State maxZoom: number = 0
+  private prevCameraId: string = ''
 
   aboutToAppear() {
     this.localDisplay = display.getDefaultDisplaySync();
@@ -205,11 +216,22 @@ export struct ReactCameraView {
       this.exposure = descriptor.props.exposure;
     }
 
-    if (descriptor.props.useNativeZoom) {
+    // 修复 truthy 检查: false 时也要更新状态, 否则 Switch 关闭后捏合变焦仍生效
+    if (descriptor.props.useNativeZoom != null) {
       Logger.debug(`RNOH in NativeCamera descriptor useNativeZoom, ${JSON.stringify(descriptor.props.useNativeZoom)}`);
       this.useNativeZoom = descriptor.props.useNativeZoom;
     }
 
+    // 接线 autoFocusPointOfInterest: prop 为 0~1 归一化坐标, 换算组件像素后交 CameraSession.focus → setFocusPoint
+    // cameraSession 在 surface 就绪前是 {} as CameraSession 空对象, 需检查 focus 方法存在
+    if (descriptor.props.autoFocusPointOfInterest != null && this.cameraSession?.focus) {
+      const p = descriptor.props.autoFocusPointOfInterest;
+      Logger.debug(`RNOH in NativeCamera autoFocusPointOfInterest, ${JSON.stringify(p)}`);
+      this.cameraSession.focus(this.focusMode, {
+        x: p.x * this.localDisplayWidth,
+        y: p.y * this.localDisplayHeight
+      });
+    }
 
     if (descriptor.props.focusDepth) {
       Logger.debug(`RNOH in NativeCamera descriptor focusDepth, ${JSON.stringify(descriptor.props.focusDepth)}`);
@@ -226,6 +248,20 @@ export struct ReactCameraView {
   private updateProp(descriptor: ReactNativeCameraDescriptor) {
     Logger.debug(`RNOH in NativeCamera descriptor props, ${JSON.stringify(descriptor.props)}`);
     this.tempProp = descriptor.props;
+    if (descriptor.props.cameraId && descriptor.props.cameraId !== '' &&
+      this.prevCameraId !== descriptor.props.cameraId) {
+      // 4.2.1 新增 cameraId prop：设备切换走 changeCameraPosition 重新 initCamera
+      this.prevCameraId = descriptor.props.cameraId;
+      this.cameraSession.changeCameraPosition({
+        surfaceId: this.surfaceId, props: this.tempProp,
+        mediaModel: this.cameraState === cameraState.PHOTO ? camera.SceneMode.NORMAL_PHOTO :
+          camera.SceneMode.NORMAL_VIDEO
+      })
+    }
+    if (descriptor.props.playSoundOnRecord != null) {
+      // 4.2.1 新增 playSoundOnRecord prop：OHOS camera API 无快门音开关对等，行为 no-op（合理差异）
+      Logger.debug(`RNOH in NativeCamera descriptor playSoundOnRecord, ${JSON.stringify(descriptor.props.playSoundOnRecord)}`);
+    }
     this.cameraSession.changeCameraPosition({
       surfaceId: this.surfaceId, props: this.tempProp,
       mediaModel: this.cameraState === cameraState.PHOTO ? camera.SceneMode.NORMAL_PHOTO : camera.SceneMode.NORMAL_VIDEO
@@ -261,9 +297,21 @@ export struct ReactCameraView {
       this.cameraSession.setAudio(descriptor.props.captureAudio)
     }
 
-    if (descriptor.props.useNativeZoom) {
+    // 修复 truthy 检查: false 时也要更新状态, 否则 Switch 关闭后捏合变焦仍生效
+    if (descriptor.props.useNativeZoom != null) {
       Logger.debug(`RNOH in NativeCamera descriptor useNativeZoom, ${JSON.stringify(descriptor.props.useNativeZoom)}`);
       this.useNativeZoom = descriptor.props.useNativeZoom;
+    }
+
+    // 接线 autoFocusPointOfInterest: prop 为 0~1 归一化坐标, 换算组件像素后交 CameraSession.focus → setFocusPoint
+    // cameraSession 在 surface 就绪前是 {} as CameraSession 空对象, 需检查 focus 方法存在
+    if (descriptor.props.autoFocusPointOfInterest != null && this.cameraSession?.focus) {
+      const p = descriptor.props.autoFocusPointOfInterest;
+      Logger.debug(`RNOH in NativeCamera autoFocusPointOfInterest, ${JSON.stringify(p)}`);
+      this.cameraSession.focus(this.focusMode, {
+        x: p.x * this.localDisplayWidth,
+        y: p.y * this.localDisplayHeight
+      });
     }
 
     if (descriptor.props.maxZoom > 0) {
@@ -486,6 +534,7 @@ export struct ReactCameraView {
           }
           if (command === 'record') {
             const options = args[0] as RecordVideoOptions;
+            Logger.info(TAG, 'CMD-IN record command received, options=' + JSON.stringify(options));
             Logger.debug(TAG, `registerCommandCallback: record.${JSON.stringify(options)}}`)
             if (this.cameraState == cameraState.PHOTO) {
               this.cameraState = cameraState.VIDEO
@@ -512,6 +561,7 @@ export struct ReactCameraView {
 
           }
           if (command === 'stopRecording') {
+            Logger.info(TAG, 'CMD-IN stopRecording command received');
             Logger.debug(TAG, `registerCommandCallback: stopRecording,  ${command}`)
             this.stopRecording();
             this.ctx.rnInstance.emitComponentEvent(
@@ -685,13 +735,19 @@ export struct ReactCameraView {
    * 停止录制
    */
   async stopRecording() {
-    await this.cameraSession.stopRecording()
-    this.isRecording = false
-    //当帧率设置30fps时直接回调，不需要转换，系统默认录制出来是30fps
-    if (this.cameraSession.fps == 30) {
-      Logger.debug("stopRecording fps 30")
-      this.cameraSession.sendOnRecordingFinishedEvent(OrientationUtils.getDefaultDisplay());
-      return;
+    try {
+      await this.cameraSession.stopRecording()
+    } catch (error) {
+      // session 停止失败(reset 状态冲突等)不能阻断完成事件回调
+      Logger.error(TAG, 'stopRecording: session stop failed: ' + JSON.stringify(error));
+    } finally {
+      this.isRecording = false
+      //当帧率设置30fps时直接回调，不需要转换，系统默认录制出来是30fps
+      if (this.cameraSession.fps == 30) {
+        Logger.debug("stopRecording fps 30")
+        this.cameraSession.sendOnRecordingFinishedEvent(OrientationUtils.getDefaultDisplay());
+        return;
+      }
     }
     //由于系统Api media.AVRecorder->prepare录制后videoFrameRate设置无效，因此使用FFmpeg处理帧率转换
     let inPath = this.cameraSession.videoUri;
@@ -815,7 +871,8 @@ export struct ReactCameraView {
         .height('100%')
         .justifyContent(FlexAlign.Center)
         .gesture(
-          GestureGroup(GestureMode.Parallel, PinchGesture({ fingers: 2 })// 当捏合手势触发时，可以通过回调函数获取缩放比例，从而修改组件的缩放比例
+          GestureGroup(GestureMode.Parallel,
+            PinchGesture({ fingers: 2 })// 当捏合手势触发时，可以通过回调函数获取缩放比例，从而修改组件的缩放比例
             .onActionUpdate((event: GestureEvent) => {
               this.scaleValue = this.cameraSession.photoPreviewScale * event.scale;
             })
@@ -827,9 +884,30 @@ export struct ReactCameraView {
                   this.cameraSession?.setNativeSmoothZoom(this.scaleValue);
                 }
               }
-            }))
-          // 在组件上绑定三指触发的捏合手势
-
+            })
+            ,
+            // onDoubleTap 链路: 双击手势 → emit onTouch{tapCallback:{isDoubleTap, touchOrigin}} → cpp handler → JS _onTouch 分发 onDoubleTap
+            TapGesture({ count: 2 })
+              .onAction((event: GestureEvent) => {
+                // GestureEvent 静态类型无坐标, 运行时为 TapGestureEvent, 经 tapLocation 取组件相对坐标(vp)
+                const tapLocation = (event as TapGestureEvent).tapLocation;
+                this.ctx.rnInstance.emitComponentEvent(
+                  this.tag,
+                  VisionCameraViewSpec.NAME,
+                  {
+                    type: 'onTouch',
+                    // cpp 侧 NativeCameraEventEmitRequestHandler 从 payload.tapCallback 取值
+                    tapCallback: {
+                      isDoubleTap: true,
+                      touchOrigin: {
+                        x: tapLocation ? Math.round(tapLocation.x) : 0,
+                        y: tapLocation ? Math.round(tapLocation.y) : 0
+                      }
+                    }
+                  }
+                )
+              })
+          )
         )
       }
       .width(this.localDisplayWidth + 'px')

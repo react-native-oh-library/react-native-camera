@@ -72,6 +72,10 @@ type VideoCodec = Readonly<{
   AppleProRes422: symbol;
   AppleProRes4444: symbol;
 }>;
+type ImageType = Readonly<{
+  'jpeg': any;
+  'png': any;
+}>;
 
 type FaceDetectionClassifications = Readonly<{ all: any; none: any }>;
 type FaceDetectionLandmarks = Readonly<{ all: any; none: any }>;
@@ -119,6 +123,7 @@ export interface Constants {
   Type: CameraType;
   WhiteBalance: WhiteBalance;
   VideoQuality: VideoQuality;
+  ImageType: ImageType;
   BarCodeType: BarCodeType;
   FaceDetection: {
     Classifications: FaceDetectionClassifications;
@@ -168,6 +173,7 @@ export interface GoogleVisionBarcodesDetectedEvent {
 
 export interface RNCameraProps {
   children?: ReactNode | FaCC;
+  cameraId?: string;
 
   autoFocus?: keyof AutoFocus;
   autoFocusPointOfInterest?: Point;
@@ -227,7 +233,7 @@ export interface RNCameraProps {
   onGoogleVisionBarcodesDetected?(event: GoogleVisionBarcodesDetectedEvent): void;
 
   // limiting scan area
-  rectOfInterest?: Point;
+  rectOfInterest?: RectOfInterest;
 
   // -- FACE DETECTION PROPS
 
@@ -248,6 +254,8 @@ export interface RNCameraProps {
   permissionDialogMessage?: string;
   /** Android only */
   playSoundOnCapture?: boolean;
+  /** Android only */
+  playSoundOnRecord?: boolean;
 
   androidCameraPermissionOptions?: {
     title: string;
@@ -284,6 +292,8 @@ interface Size<T = number> {
   width: T;
   height: T;
 }
+
+interface RectOfInterest extends Point,Size{}
 
 export interface Barcode {
   bounds: {
@@ -425,6 +435,8 @@ interface TakePictureOptions {
 
   /** iOS only */
   forceUpOrientation?: boolean;
+  imageType?: keyof ImageType;
+  path?: string;
 }
 
 export interface TakePictureResponse {
@@ -462,6 +474,15 @@ export interface RecordResponse {
   codec: VideoCodec[keyof VideoCodec];
 }
 
+export interface HardwareCamera {
+  /** (iOS only) e.g: 'AVCaptureDeviceTypeBuiltInWideAngleCamera', 'AVCaptureDeviceTypeBuiltInUltraWideCamera' */
+  deviceType?: string;
+  id: string;
+  type: number;
+}
+
+export function hasTorch(): Promise<boolean>;
+
 export class RNCamera extends Component<RNCameraProps & ViewProperties> {
   static Constants: Constants;
 
@@ -475,9 +496,12 @@ export class RNCamera extends Component<RNCameraProps & ViewProperties> {
   pausePreview(): void;
   resumePreview(): void;
   getAvailablePictureSizes(): Promise<string[]>;
+  getCameraIdsAsync(): Promise<HardwareCamera[]>;
 
   /** Android only */
   getSupportedRatiosAsync(): Promise<string[]>;
+  getSupportedPreviewFpsRange: Promise<string[]>;
+  static checkIfVideoIsValid: Promise<boolean>;
 
   /** iOS only */
   isRecording(): Promise<boolean>;
