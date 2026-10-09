@@ -1,7 +1,19 @@
 [**THE CHANGELOG OF FURTHER VERSIONS (STARTING WITH 1.4.0) IS MAINTAINED WITH GITHUB RELEASES AND CAN BE FOUND HERE**](https://github.com/react-native-community/react-native-camera/releases)
+
+#### 3.42.1
+
+* release version 3.42.1
+
+#### 3.42.1-rc.1
+
+* pre-release version 3.42.1-rc.1
+* 修复扫码过程中卸载相机组件导致的崩溃问题 ([#51](https://github.com/react-native-oh-library/react-native-camera/pull/51 ))
+
 #### 3.42.0
 
 * release version 3.42.0
+* 增加 README 相关链接 ([#46](https://github.com/react-native-oh-library/react-native-camera/pull/46 ))
+* 修改 README 描述 ([#47](https://github.com/react-native-oh-library/react-native-camera/pull/47 ))
 
 #### 3.42.0-rc.2
 
