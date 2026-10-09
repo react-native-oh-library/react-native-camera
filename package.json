@@ -42,7 +42,7 @@
     "metro": "0.82.5",
     "memfs": "4.17.2"
   },
-  "homepage": "https://github.com/react-native-community/react-native-camera",
+  "homepage": "https://github.com/react-native-oh-library/react-native-camera/tree/br_rnoh0.82",
   "keywords": [
     "barcode",
     "camera",
