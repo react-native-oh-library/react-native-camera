@@ -167,6 +167,7 @@ ohpm install
 
 > [!TIP] 以下功能依赖特定版本的API，使用 `低于指定API版本的工程编译` 或 `低于指定API版本的ROM运行` 均可能导致部分功能受限。
 1. `whiteBalance` 属性需要在支持 `API20+` 的工程编译，并在支持 `API20+` 的 ROM 上运行，方可生效。
+2. `recordAsync` 的 `maxDuration` 参数依赖 `API18+`，低于该版本不生效（录像不会自动停止，不影响其它功能）。
 
 ### 权限要求
 
@@ -311,7 +312,7 @@ const styles = StyleSheet.create({
 | pendingAuthorizationView | 正在授权显示的ui | View | no | Android | no |
 | ratio | 相机比例 | string | no | Android | no |
 | defaultVideoQuality | 默认视频分辨率 | string | no | iOS/Android | yes |
-| autoFocusPointOfInterest | 设置自动对焦点（x/y） | Point | no | iOS/Android | no |
+| autoFocusPointOfInterest | 设置自动对焦点（x/y，0~1 归一化坐标） | Point | no | iOS/Android | yes |
 | useNativeZoom | 启用原生捏合缩放手势 | boolean | no | iOS/Android | yes |
 | onStatusChange | 相机状态变化回调；event 含 cameraStatus、recordAudioPermissionStatus | `(event: {cameraStatus, recordAudioPermissionStatus}) => void` | no | iOS/Android | yes |
 | onMountError | 相机异常回调；error.message 为错误信息 | `(error: {message}) => void` | no | iOS/Android | yes |
@@ -362,6 +363,41 @@ const styles = StyleSheet.create({
 | hasTorch | 查询设备是否支持闪光灯；返回 true/false | `() => Promise<boolean>` | no | iOS/Android | yes |
 | refreshAuthorizationStatus | 重新请求相机/麦克风权限；resolve 后可读取最新授权状态 | `() => Promise<void>` | no | iOS/Android | yes |
 | getSupportedRatiosAsync | 获取支持的预览宽高比；resolve 出 string[]，如 "4:3"、"16:9" | `() => Promise<string[]>` | no | Android | yes |
+| isRecording | 查询当前是否正在录像；resolve 出 boolean | `() => Promise<boolean>` | no | iOS/Android | yes |
+| getStatus | 查询相机状态；返回 CameraStatus | `() => Status` | no | iOS/Android | yes |
+| arePermissionsGranted | 查询相机/录音授权 | `() => Promise<{hasCameraPermissions, recordAudioPermissionStatus}>` | no | iOS/Android | yes |
+
+### takePictureAsync 参数说明
+
+| 参数 | 说明 | HarmonyOS Support |
+| ---- | ----------- | ----------------- |
+| quality | 拍照质量 0~1 | yes |
+| orientation | 拍照方向：auto / landscapeLeft / landscapeRight / portrait / portraitUpsideDown | yes |
+| base64 | 响应中附带 base64 编码图片数据 | yes |
+| mirrorImage | 图片左右镜像；依赖设备镜像能力，不支持的设备不翻转 | yes |
+| exif | 响应中附带 exif 元数据（拍摄时间、朝向、设备等） | yes |
+| imageType | 输出格式：jpeg / png | yes |
+| path | 自定义保存路径（支持中文/空格/#& 等字符） | yes |
+| width | 指定输出宽度 | no |
+| writeExif | 写入自定义 exif | no |
+| fixOrientation | 自动修正方向 | no |
+| forceUpOrientation | 强制竖直方向 | no |
+| pauseAfterCapture | 拍照后暂停预览 | no |
+
+### recordAsync 参数说明
+
+| 参数 | 说明 | HarmonyOS Support |
+| ---- | ----------- | ----------------- |
+| quality | 录像质量档位（VideoQuality 枚举） | no |
+| orientation | 录像方向 | no |
+| maxDuration | 最大时长，单位秒；到时自动停止并回调（需 API18+，见"编译运行API要求"） | yes |
+| maxFileSize | 最大文件大小 | no |
+| mute | 静音录像 | yes |
+| videoBitrate | 视频码率（bps）；≤1 时回落默认 512000 | yes |
+| fps | 帧率 | yes |
+| codec | 编码格式：h264 / h265 | yes |
+| mirrorVideo | 录像画面镜像 | no |
+| path | 自定义保存路径 | no |
 
 ### Constants
 
@@ -377,12 +413,17 @@ const styles = StyleSheet.create({
 | WhiteBalance | whiteBalance 属性 | sunny / cloudy / shadow / incandescent / fluorescent / auto | yes |
 | VideoQuality | defaultVideoQuality 属性、recordAsync 的 quality | 2160p / 1080p / 720p / 480p / 4:3 | yes |
 | ImageType | takePictureAsync 的 imageType | jpeg / png | yes |
-| Orientation | takePictureAsync / recordAsync 的 orientation | auto / landscapeLeft / landscapeRight / portrait / portraitUpsideDown | no |
+| Orientation | takePictureAsync / recordAsync 的 orientation | auto / landscapeLeft / landscapeRight / portrait / portraitUpsideDown | yes |
 | VideoStabilization | videoStabilizationMode 属性 | off / standard / cinematic / auto | no |
 | BarCodeType | barCodeTypes 属性 | aztec / code128 / code39 / code39mod43 / code93 / ean13 / ean8 / pdf417 / qr / upc_e / interleaved2of5 / itf14 / datamatrix | no |
 | VideoCodec | recordAsync 的 codec（iOS） | H264 / JPEG / HVEC / AppleProRes422 / AppleProRes4444 | no |
 | FaceDetection | faceDetectionMode 等属性 | Mode: fast / accurate；Landmarks: all / none；Classifications: all / none | no |
 | GoogleVisionBarcodeDetection | googleVisionBarcodeType 等属性（Android） | BarcodeType: CODE_128 / CODE_39 / CODABAR / DATA_MATRIX / EAN_13 / EAN_8 / ITF / QR_CODE / UPC_A / UPC_E / PDF417 / AZTEC / ALL；BarcodeMode: NORMAL / ALTERNATE / INVERTED | no |
+
+## 已知行为差异与说明
+
+- 扫码内容特殊字符：harmony 使用系统 Scan Kit 识别条码。中文、SQL 注入串、零宽字符、300 字符长文本均可完整识别；**emoji 与控制字符受系统扫码引擎限制，识别结果可能缺失或被过滤**。
+- `mirrorImage` 依赖设备镜像能力：设备不支持镜像拍照时不翻转。
 
 ## 遗留问题
 

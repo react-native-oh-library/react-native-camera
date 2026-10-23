@@ -56,6 +56,7 @@ export interface PhotoFile {
   deviceOrientation:number
   base64:string
   path: string
+  exif?: Record<string, string> // 补充: exif 选项请求时随响应返回
 }
 
 export interface ScanResult {

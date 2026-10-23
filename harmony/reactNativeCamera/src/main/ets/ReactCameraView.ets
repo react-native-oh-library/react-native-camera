@@ -100,6 +100,8 @@ export struct ReactCameraView {
   private localDisplay?: display.Display;
   private cameraSession: CameraSession = {} as CameraSession;
   private cameraState: cameraState = cameraState.PHOTO;
+  // 补充: record 命令的真实 options(initSession 重建 session 后赋给 videoStartParams, 修复首次录像 options 被忽略)
+  private pendingRecordOptions: RecordVideoOptions | undefined = undefined;
   rect: SurfaceRect = { surfaceWidth: 1920, surfaceHeight: 1080 };
   private scanSession: ScanSession = {} as ScanSession;
   private cameraManager: CameraManager = new CameraManager();
@@ -211,7 +213,7 @@ export struct ReactCameraView {
     Logger.debug(`RNOH in NativeCamera descriptor props, ${JSON.stringify(descriptor.props)}`);
     this.tempProp = descriptor.props;
 
-    if (descriptor.props.exposure) {
+    if (descriptor.props.exposure != null) {
       Logger.debug(`RNOH in NativeCamera descriptor exposure, ${JSON.stringify(descriptor.props.exposure)}`);
       this.exposure = descriptor.props.exposure;
     }
@@ -233,7 +235,7 @@ export struct ReactCameraView {
       });
     }
 
-    if (descriptor.props.focusDepth) {
+    if (descriptor.props.focusDepth != null) {
       Logger.debug(`RNOH in NativeCamera descriptor focusDepth, ${JSON.stringify(descriptor.props.focusDepth)}`);
       this.focusDepth = descriptor.props.focusDepth;
     }
@@ -286,7 +288,7 @@ export struct ReactCameraView {
       })
     }
 
-    if (descriptor.props.exposure) {
+    if (descriptor.props.exposure != null) {
       Logger.debug(`RNOH in NativeCamera descriptor exposure, ${JSON.stringify(descriptor.props.exposure)}`);
       this.exposure = descriptor.props.exposure;
       this.cameraSession.setExposure(this.exposure)
@@ -318,7 +320,7 @@ export struct ReactCameraView {
       this.maxZoom = descriptor.props.maxZoom
     }
 
-    if (descriptor.props.zoom && this.zoom != descriptor.props.zoom) {
+    if (descriptor.props.zoom != null && this.zoom != descriptor.props.zoom) {
       Logger.debug(`RNOH in NativeCamera descriptor zoom, ${JSON.stringify(descriptor.props.zoom)}`);
       this.zoom = descriptor.props.zoom;
       if (this.maxZoom > 0) {
@@ -334,7 +336,7 @@ export struct ReactCameraView {
 
     }
 
-    if (descriptor.props.focusDepth) {
+    if (descriptor.props.focusDepth != null) {
       Logger.debug(`RNOH in NativeCamera descriptor focusDepth, ${JSON.stringify(descriptor.props.focusDepth)}`);
       this.focusDepth = descriptor.props.focusDepth;
     }
@@ -358,7 +360,7 @@ export struct ReactCameraView {
       Logger.debug("autoFocus" + descriptor.props.autoFocus)
       this.focusMode = camera.FocusMode.FOCUS_MODE_AUTO
       this.cameraSession.focus(this.focusMode, { x: 480, y: 860 });
-    } else if (descriptor.props.autoFocus != "on" && descriptor.props.focusDepth) {
+    } else if (descriptor.props.autoFocus != "on" && descriptor.props.focusDepth != null) {
       Logger.debug("focusDepth" + descriptor.props.focusDepth)
       this.focusMode = camera.FocusMode.FOCUS_MODE_AUTO
       this.cameraSession.focus(this.focusMode, { x: descriptor.props.focusDepth * 90, y: descriptor.props.focusDepth * 160  })
@@ -384,6 +386,8 @@ export struct ReactCameraView {
       } else {
         Logger.debug("CameraSession")
         this.cameraSession = new CameraSession(this.ctx);
+        // 补充: 把最近一次 record 命令的 options 带进新 session(recordPrepared 预配置用)
+        this.cameraSession.videoStartParams = this.pendingRecordOptions !== undefined ? this.pendingRecordOptions : {};
         this.cameraSession.setTagId(this.tag)
         await this.cameraSession.initCamera(this.surfaceId, props,
           this.cameraState === cameraState.PHOTO ? camera.SceneMode.NORMAL_PHOTO : camera.SceneMode.NORMAL_VIDEO)
@@ -534,6 +538,8 @@ export struct ReactCameraView {
           }
           if (command === 'record') {
             const options = args[0] as RecordVideoOptions;
+            if (this.isRecording) { Logger.error(TAG, "record: already recording, ignore duplicate record"); return; }
+            this.pendingRecordOptions = options;
             Logger.info(TAG, 'CMD-IN record command received, options=' + JSON.stringify(options));
             Logger.debug(TAG, `registerCommandCallback: record.${JSON.stringify(options)}}`)
             if (this.cameraState == cameraState.PHOTO) {
@@ -727,6 +733,7 @@ export struct ReactCameraView {
    * 开始录制
    */
   startRecording(options: RecordVideoOptions): void {
+    this.cameraSession.onRecordingAutoStopped = () => this.finishRecordingOnAutoStop();
     this.isRecording = true
     this.cameraSession.startRecording(options,this.tempProp)
   }
@@ -735,19 +742,43 @@ export struct ReactCameraView {
    * 停止录制
    */
   async stopRecording() {
+    if (this.cameraSession) {
+      // 手动停止前先消费自动停标志, 避免 stateChange 再触发一次收尾
+      this.cameraSession.isRecordingActive = false;
+    }
     try {
       await this.cameraSession.stopRecording()
     } catch (error) {
-      // session 停止失败(reset 状态冲突等)不能阻断完成事件回调
       Logger.error(TAG, 'stopRecording: session stop failed: ' + JSON.stringify(error));
     } finally {
       this.isRecording = false
-      //当帧率设置30fps时直接回调，不需要转换，系统默认录制出来是30fps
-      if (this.cameraSession.fps == 30) {
-        Logger.debug("stopRecording fps 30")
-        this.cameraSession.sendOnRecordingFinishedEvent(OrientationUtils.getDefaultDisplay());
-        return;
-      }
+    }
+    await this.sendFinishedAfterStop();
+  }
+
+  /**
+   * 补充: maxDuration 到点等自动停止时由 stateChange 一次性回调进入, 走与手动 stop 相同的收尾
+   */
+  private async finishRecordingOnAutoStop(): Promise<void> {
+    Logger.error(TAG, 'finishRecordingOnAutoStop: recording auto-stopped, running finish chain');
+    this.isRecording = false
+    try {
+      await this.cameraSession.stopRecording()
+    } catch (error) {
+      Logger.error(TAG, 'finishRecordingOnAutoStop: session stop failed: ' + JSON.stringify(error));
+    }
+    await this.sendFinishedAfterStop();
+  }
+
+  /**
+   * 补充: 录像停止后的公共收尾(fps 转换 + onRecordingFinished 事件), 手动/自动停止共用
+   */
+  private async sendFinishedAfterStop(): Promise<void> {
+    //当帧率设置30fps时直接回调，不需要转换，系统默认录制出来是30fps
+    if (this.cameraSession.fps == 30) {
+      Logger.debug("stopRecording fps 30")
+      this.cameraSession.sendOnRecordingFinishedEvent(OrientationUtils.getDefaultDisplay());
+      return;
     }
     //由于系统Api media.AVRecorder->prepare录制后videoFrameRate设置无效，因此使用FFmpeg处理帧率转换
     let inPath = this.cameraSession.videoUri;
@@ -759,7 +790,7 @@ export struct ReactCameraView {
           await this_.copyFile(outPath, inPath);
           this_.cameraSession.sendOnRecordingFinishedEvent(OrientationUtils.getDefaultDisplay());
         } else {
-          this.ctx && this.ctx.rnInstance.emitDeviceEvent('onRecordingError',
+          this_.ctx && this_.ctx.rnInstance.emitDeviceEvent('onRecordingError',
             new CameraCaptureError('capture/recording-in-progress', 'Failed to stop recording.'));
         }
       }
@@ -767,7 +798,6 @@ export struct ReactCameraView {
     MP4Parser.ffmpegCmd("ffmpeg -y -i " + inPath + " -r " + this.cameraSession.fps + " -c:v libopenh264 -c:a copy " +
       outPath, callBack)
   }
-
   /**
    * 拷贝文件
    * @param srcPath

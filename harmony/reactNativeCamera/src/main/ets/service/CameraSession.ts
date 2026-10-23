@@ -94,7 +94,7 @@ export default class CameraSession {
 
   public preVideoQuality = '1080p'
 
-  private videoStartParams: RecordVideoOptions = {}
+  videoStartParams: RecordVideoOptions = {} // 补充: 改 public, 由视图层注入 record 命令的真实 options
   // preview原点相对于设备原点x偏移量
   private offsetX: number = 0;
   // preview原点相对于设备原点y偏移量
@@ -104,6 +104,11 @@ export default class CameraSession {
   // 4.2.1 新增拍照选项：imageType（jpeg/png）与自定义保存 path
   private pendingImageType: string = 'jpeg';
   private pendingPhotoPath: string = '';
+  // 拍照保存失败标记: savePicture 写文件失败时置 true, waitForPathResult 据此退出(避免 promise 悬挂)
+  private photoSaveFailed: boolean = false;
+  // 补充: 录像自动停止(如 maxDuration 到点)时置 false 并回调视图层收尾; 手动 stop 前先消费该标志避免双发
+  isRecordingActive: boolean = false;
+  onRecordingAutoStopped: (() => void) | null = null;
 
   constructor(_ctx?: RNOHContext) {
     _ctx && (this.ctx = _ctx);
@@ -668,6 +673,16 @@ export default class CameraSession {
     }
     this.avRecorder.on('stateChange', async (state: media.AVRecorderState, reason: media.StateChangeReason) => {
       Logger.info('case state has changed, new state is: ' + state + ', and reason is: ' + reason);
+      // 补充: maxDuration 到点或系统原因自动停止时, 走与手动 stop 相同的收尾链(防挂起)
+      if (state === 'stopped' && this.isRecordingActive) {
+        this.isRecordingActive = false;
+        Logger.error(TAG, 'recording auto-stopped (maxDuration/other), run finish chain');
+        let cb = this.onRecordingAutoStopped;
+        this.onRecordingAutoStopped = null;
+        if (cb !== null && cb !== undefined) {
+          cb();
+        }
+      }
     });
     let videoSurfaceId = await this.avRecorder.getInputSurface();
     let videoOutput: camera.VideoOutput;
@@ -685,8 +700,9 @@ export default class CameraSession {
    */
   prepareAVRecorderConfig(options: RecordVideoOptions, prop: TempCameraProps): media.AVRecorderConfig {
     let videoBitRate: number = 512000
-    if (options.videoBitRate) {
-      videoBitRate = options.videoBitRate
+    let bitrateOpt: number | undefined = options.videoBitrate !== undefined ? options.videoBitrate : options.videoBitRate;
+    if (bitrateOpt !== undefined && bitrateOpt > 0) {
+      videoBitRate = bitrateOpt
     }
     if (prop.captureAudio) {
       this.hasAudio = true
@@ -753,7 +769,10 @@ export default class CameraSession {
       }
     }
     if (options.maxDuration) {
-      aVVideo.maxDuration = options.maxDuration
+      if (deviceinfo.sdkApiVersion >= 18) {
+        aVVideo.maxDuration = options.maxDuration
+        Logger.error(TAG, "maxDuration SET " + options.maxDuration + "s, sdkApi=" + deviceinfo.sdkApiVersion);
+      } else { Logger.error(TAG, "maxDuration SKIPPED, sdkApi=" + deviceinfo.sdkApiVersion + " < 18"); }
     }
 
     if (options.orientation) {
@@ -867,14 +886,17 @@ export default class CameraSession {
       return;
     }
     try {
-      //[-4,4]
+      // 上游语义(RNCamera.md: -1=auto 不干预, [0,1] 归一化映射到设备曝光补偿区间, 越界取中性)
       const [min, max]: Array<number> = cameraSession.getExposureBiasRange();
-      exposure = exposure * 4;
-      if (exposure >= min && exposure <= max) {
-        cameraSession?.setExposureBias(exposure);
-        Logger.debug(`RNOH in setExposureBias success`);
-      } else {
+      let bias: number = 0;
+      if (exposure === -1) {
+        // -1 = auto: 不调用 setExposureBias, 保持系统自动曝光
+        return;
+      } else if (exposure >= 0 && exposure <= 1) {
+        bias = Math.round(exposure * (max - min)) + min;
       }
+      cameraSession?.setExposureBias(bias);
+      Logger.debug(`RNOH in setExposureBias success bias=${bias}`);
     } catch (error) {
       Logger.error(TAG, `The setExposureBias call failed. error code: ${error.code}`);
     }
@@ -1112,7 +1134,11 @@ export default class CameraSession {
       _file = fs.openSync(photoFile, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE);
       await fs.write(_file.fd, buffer);
     } catch (error) {
-      Logger.error(TAG, `savePicture statSync failed,code:${error}.`);
+      // 失败路径(如超长/非法 path 写文件失败): 标记失败并上报, 让 waitForPathResult 能退出, 避免 JS 侧 promise 悬挂
+      Logger.error(TAG, `savePicture write failed, path length:${photoFile.length}, error:${JSON.stringify(error)}`);
+      this.onError(`savePicture write failed: ${JSON.stringify(error)}`);
+      this.photoSaveFailed = true;
+      return;
     }
     fs.closeSync(_file);
     this.photoPath = photoFile;
@@ -1296,6 +1322,8 @@ export default class CameraSession {
       this.pendingImageType = 'jpeg';
       this.pendingPhotoPath = '';
     }
+    // 每次拍照前重置失败标记
+    this.photoSaveFailed = false;
 
     let quality = camera.QualityLevel.QUALITY_LEVEL_MEDIUM;
     if (options) {
@@ -1311,9 +1339,9 @@ export default class CameraSession {
         this.photoCaptureSetting.quality = quality;
       }
 
-      if (options.mirrorImage) {
-        this.photoCaptureSetting.mirror = options.mirrorImage;
-      }
+      // 补充: 每次显式赋值(含 false), 修复 mirror 粘滞; 并记录设备硬件镜像能力供真机定位
+      this.photoCaptureSetting.mirror = !!options.mirrorImage;
+      Logger.info(TAG, "mirror supported: " + this.photoOutPut.isMirrorSupported());
 
       if (options.orientation) {
         switch (options.orientation) {
@@ -1362,6 +1390,8 @@ export default class CameraSession {
     photoFile.path = this.photoPath;
     photoFile.pictureOrientation = this.getOrientation(this.photoCaptureSetting.rotation)
 
+    // photoPath 为空说明 savePicture 写入失败(如超长/非法 path), 跳过 EXIF/base64 处理避免对空路径二次异常
+    if (this.photoPath !== '') {
     let imageSource = image.createImageSource(this.photoPath); // this.uri 为图片的本地 URI
     // 获取 EXIF 标签 'DateTime'
     let key = [image.PropertyKey.BITS_PER_SAMPLE,
@@ -1476,10 +1506,21 @@ export default class CameraSession {
       image.PropertyKey.DEVICE_SETTING_DESCRIPTION,
       image.PropertyKey.SUBJECT_DISTANCE_RANGE
     ];
-    imageSource.getImageProperties(key).then((data) => {
-    }).catch((err: BusinessError) => {
-      Logger.error(JSON.stringify(err));
-    });
+      if (options && options.exif) {
+        try {
+          let props = await imageSource.getImageProperties(key);
+          let exifObj: Record<string, string> = {};
+          key.forEach((k: image.PropertyKey) => {
+            let v = props[k];
+            if (v !== null && v !== undefined) {
+              exifObj[String(k)] = v;
+            }
+          });
+          photoFile.exif = exifObj;
+        } catch (err) {
+          Logger.error(TAG, "readExif failed: " + JSON.stringify(err));
+        }
+      }
     if (options.base64) {
       let file = fs.openSync(this.photoPath, fs.OpenMode.READ_WRITE); // 打开文件
 
@@ -1496,10 +1537,12 @@ export default class CameraSession {
       Logger.info("" + retStr) // 打印结果
       photoFile.base64 = retStr;
     }
+    }
 
     photoFile.deviceOrientation = devOrientation;
 
     this.photoPath = '';
+    this.photoSaveFailed = false;
     return photoFile;
   }
 
@@ -1539,11 +1582,16 @@ export default class CameraSession {
   private waitForPathResult(): Promise<void> {
     return new Promise(resolve => {
       const intervalId = setInterval(() => {
-        if (this.photoPath !== '') {
+        if (this.photoPath !== '' || this.photoSaveFailed) {
           clearInterval(intervalId);
           resolve();
         }
       }, 100);
+      // 超时兜底(10s): savePicture 异常未及标记等情况也放行, 避免调用方 promise 永久悬挂
+      setTimeout(() => {
+        clearInterval(intervalId);
+        resolve();
+      }, 10000);
     })
   }
 
@@ -1733,6 +1781,7 @@ export default class CameraSession {
     try {
       // 开始录制
       await this.avRecorder.start();
+      this.isRecordingActive = true;
     } catch (error) {
       Logger.error(TAG, 'startRecording catch Failed to start recording.' + JSON.stringify(error))
       this.ctx && this.ctx.rnInstance.emitDeviceEvent('onRecordingError',

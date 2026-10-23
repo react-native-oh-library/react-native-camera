@@ -163,6 +163,7 @@ Verified on:
 
 > [!TIP] The following features depend on specific API versions; compiling with projects or running on ROMs below the specified API version may cause partial feature limitation.
 1. The `whiteBalance` property requires a project compiled with `API20+` and a ROM supporting `API20+` to take effect.
+2. The `maxDuration` parameter of `recordAsync` requires `API18+`; on lower versions it does not take effect (recording will not stop automatically, other features unaffected).
 
 ### Permission Requirements
 
@@ -307,7 +308,7 @@ const styles = StyleSheet.create({
 | pendingAuthorizationView | UI shown while authorizing | View | no | Android | no |
 | ratio | Camera ratio | string | no | Android | no |
 | defaultVideoQuality | Default video quality | string | no | iOS/Android | yes |
-| autoFocusPointOfInterest | Set auto focus point (x/y) | Point | no | iOS/Android | no |
+| autoFocusPointOfInterest | Set auto focus point (x/y, normalized 0~1) | Point | no | iOS/Android | yes |
 | useNativeZoom | Enable native pinch-to-zoom gesture | boolean | no | iOS/Android | yes |
 | onStatusChange | Camera status change callback; event contains cameraStatus, recordAudioPermissionStatus | `(event: {cameraStatus, recordAudioPermissionStatus}) => void` | no | iOS/Android | yes |
 | onMountError | Camera error callback; error.message is the error message | `(error: {message}) => void` | no | iOS/Android | yes |
@@ -358,6 +359,40 @@ const styles = StyleSheet.create({
 | hasTorch | Query flash support; returns true/false | `() => Promise<boolean>` | no | iOS/Android | yes |
 | refreshAuthorizationStatus | Re-request camera/microphone permission; after resolve the latest authorization status can be read | `() => Promise<void>` | no | iOS/Android | yes |
 | getSupportedRatiosAsync | Get supported preview aspect ratios; resolves with string[] such as "4:3", "16:9" | `() => Promise<string[]>` | no | Android | yes |
+| isRecording | Query whether recording is in progress; resolves with boolean | `() => Promise<boolean>` | no | iOS/Android | yes |
+| getStatus | Query camera status; returns CameraStatus | `() => Status` | no | iOS/Android | yes |
+| arePermissionsGranted | Query camera/audio permission | `() => Promise<{hasCameraPermissions, recordAudioPermissionStatus}>` | no | iOS/Android | yes |
+### takePictureAsync Options
+
+| Option | Description | HarmonyOS Support |
+| ---- | ----------- | ----------------- |
+| quality | Photo quality 0~1 | yes |
+| orientation | Photo orientation: auto / landscapeLeft / landscapeRight / portrait / portraitUpsideDown | yes |
+| base64 | Include base64-encoded image data in the response | yes |
+| mirrorImage | Mirror the photo horizontally; depends on the device mirror capability (not flipped on unsupported devices) | yes |
+| exif | Include exif metadata in the response (capture time, orientation, device, etc.) | yes |
+| imageType | Output format: jpeg / png | yes |
+| path | Custom save path (supports Chinese characters, spaces, #&, etc.) | yes |
+| width | Requested output width | no |
+| writeExif | Write custom exif | no |
+| fixOrientation | Auto-correct orientation | no |
+| forceUpOrientation | Force upright orientation | no |
+| pauseAfterCapture | Pause preview after capture | no |
+
+### recordAsync Options
+
+| Option | Description | HarmonyOS Support |
+| ---- | ----------- | ----------------- |
+| quality | Recording quality level (VideoQuality enum) | no |
+| orientation | Recording orientation | no |
+| maxDuration | Maximum duration in seconds; stops automatically and resolves when reached (requires API18+, see "Compilation and Runtime API Requirements") | yes |
+| maxFileSize | Maximum file size | no |
+| mute | Record without audio | yes |
+| videoBitrate | Video bitrate (bps); falls back to 512000 when <= 1 | yes |
+| fps | Frame rate | yes |
+| codec | Codec: h264 / h265 | yes |
+| mirrorVideo | Mirror the recorded video | no |
+| path | Custom save path | no |
 
 ### Constants
 
@@ -370,15 +405,20 @@ Enum constants are accessed via `RNCamera.Constants` (e.g. `RNCamera.Constants.F
 | AutoFocus | autoFocus prop | on / off | yes |
 | FlashMode | flashMode prop | on / off / torch / auto | yes |
 | CameraType | type prop | front / back | yes |
-| WhiteBalance | whiteBalance prop | sunny / cloudy / shadow / incandescent / fluorescent / auto | yes (effective with API20+) |
-| VideoQuality | defaultVideoQuality prop, recordAsync quality | 2160p / 1080p / 720p / 480p / 4:3 / 288p (iOS) | yes (288p upstream iOS-only) |
+| WhiteBalance | whiteBalance prop | sunny / cloudy / shadow / incandescent / fluorescent / auto | yes |
+| VideoQuality | defaultVideoQuality prop, recordAsync quality | 2160p / 1080p / 720p / 480p / 4:3 | yes |
 | ImageType | takePictureAsync imageType | jpeg / png | yes |
-| Orientation | takePictureAsync / recordAsync orientation | auto / landscapeLeft / landscapeRight / portrait / portraitUpsideDown | no |
+| Orientation | takePictureAsync / recordAsync orientation | auto / landscapeLeft / landscapeRight / portrait / portraitUpsideDown | yes |
 | VideoStabilization | videoStabilizationMode prop | off / standard / cinematic / auto | no |
 | BarCodeType | barCodeTypes prop | aztec / code128 / code39 / code39mod43 / code93 / ean13 / ean8 / pdf417 / qr / upc_e / interleaved2of5 / itf14 / datamatrix | no |
 | VideoCodec | recordAsync codec (iOS) | H264 / JPEG / HVEC / AppleProRes422 / AppleProRes4444 | no |
 | FaceDetection | faceDetectionMode etc. | Mode: fast / accurate; Landmarks: all / none; Classifications: all / none | no |
 | GoogleVisionBarcodeDetection | googleVisionBarcodeType etc. (Android) | BarcodeType: CODE_128 / CODE_39 / CODABAR / DATA_MATRIX / EAN_13 / EAN_8 / ITF / QR_CODE / UPC_A / UPC_E / PDF417 / AZTEC / ALL; BarcodeMode: NORMAL / ALTERNATE / INVERTED | no |
+
+## Known Behavior Differences and Notes
+
+- Barcode content with special characters: harmony uses the system Scan Kit for barcode recognition. Chinese text, SQL-injection strings, zero-width characters, and 300-character long text are fully recognized; **emoji and control characters are limited by the system scanning engine and may be missing or filtered from the result**.
+- `mirrorImage` depends on the device mirror capability: photos are not flipped on devices without mirror-photo support.
 
 ## Known Issues
 

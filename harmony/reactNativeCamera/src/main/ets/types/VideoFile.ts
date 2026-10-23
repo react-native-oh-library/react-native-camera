@@ -28,6 +28,7 @@ export interface RecordVideoOptions {
   mirrorVideo?: boolean;
   path?: string;
   videoBitRate?: number;
+  videoBitrate?: number; // 4.2.1/上游 JS 字段拼写(小写 r), 优先读取
   fps?:number;
 }
 

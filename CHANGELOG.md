@@ -1,5 +1,12 @@
 [**THE CHANGELOG OF FURTHER VERSIONS (STARTING WITH 1.4.0) IS MAINTAINED WITH GITHUB RELEASES AND CAN BE FOUND HERE**](https://github.com/react-native-community/react-native-camera/releases)
 
+#### 4.0.0-beta.2
+
+* 新增 `isRecording` / `getStatus` / `arePermissionsGranted` 接口，`takePictureAsync` 支持返回 `exif` 元数据
+* 修复 `maxDuration` 到点不自动停止、首次录像 options（codec/fps/videoBitrate/maxDuration）不生效、重复录像导致预览卡死、`videoBitrate` 参数不生效等问题
+* 修复 `mirrorImage` 设置残留、`exposure` / `zoom` / `focusDepth` 传 0 不生效问题，`exposure` 语义对齐上游
+* `maxDuration` 增加 API18+ 版本守卫（低版本不生效但不崩溃）；README 补充接口表与已知行为差异说明
+
 #### 4.0.0-beta.1
 
 * Adapt to the RN0.84 framework and upgrade the baseline to 4.2.1
